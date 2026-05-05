@@ -69,12 +69,12 @@ jobs:
         uses: sigstore/cosign-installer@v3
 
       - name: Sign image (keyless via Sigstore)
+        # Sign the digest once. The signature attaches to the digest, so every
+        # tag pointing at it (latest, 0.1.0, 0.1, 0) verifies against this one
+        # signature — no per-tag iteration needed.
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: |
-          for tag in ${{ steps.meta.outputs.tags }}; do
-            cosign sign --yes "${tag}@${DIGEST}"
-          done
+        run: cosign sign --yes "${{ env.IMAGE_NAME }}@${DIGEST}"
 
       - name: Generate SBOM (CycloneDX)
         uses: anchore/sbom-action@v0
