@@ -49,8 +49,9 @@ export function createDuckDbAdapter(config) {
       try {
         const rows = await runAll(
           conn,
-          `SELECT schema_name FROM information_schema.schemata
+          `SELECT DISTINCT schema_name FROM information_schema.schemata
            WHERE schema_name NOT IN ('pg_catalog','information_schema','main_temp')
+             AND catalog_name NOT IN ('system','temp')
            ORDER BY schema_name`,
         );
         return rows.map((r) => r.schema_name);
