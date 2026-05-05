@@ -136,6 +136,92 @@ export function createPostgresAdapter(config, overrides = {}) {
       );
     },
 
+    async findColumns(pattern, { schema } = {}) {
+      const params = [pattern];
+      let where = `column_name ILIKE $1
+                   AND table_schema NOT IN ('pg_catalog','information_schema','pg_toast')
+                   AND table_schema NOT LIKE 'pg_temp_%'
+                   AND table_schema NOT LIKE 'pg_toast_temp_%'`;
+      if (schema) {
+        params.push(schema);
+        where += ` AND table_schema = $2`;
+      }
+      try {
+        const result = await pool.query(
+          `SELECT table_schema AS schema, table_name AS "table",
+                  column_name AS "column", data_type AS "type"
+           FROM information_schema.columns
+           WHERE ${where}
+           ORDER BY schema, "table", "column"`,
+          params,
+        );
+        return result.rows;
+      } catch (e) {
+        throw wrapError(e, "CATALOG_FAILED", `${type} findColumns failed`, type);
+      }
+    },
+
+    async getForeignKeys({ schema, table } = {}) {
+      const params = [];
+      const conds = [];
+      if (schema) {
+        params.push(schema);
+        conds.push(`tc.table_schema = $${params.length}`);
+      }
+      if (table) {
+        params.push(table);
+        conds.push(`tc.table_name = $${params.length}`);
+      }
+      const whereClause = conds.length ? `AND ${conds.join(" AND ")}` : "";
+      try {
+        const result = await pool.query(
+          `SELECT tc.table_schema   AS from_schema,
+                  tc.table_name     AS from_table,
+                  kcu.column_name   AS from_column,
+                  ccu.table_schema  AS to_schema,
+                  ccu.table_name    AS to_table,
+                  ccu.column_name   AS to_column,
+                  tc.constraint_name
+           FROM information_schema.table_constraints AS tc
+           JOIN information_schema.key_column_usage AS kcu
+             ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+           JOIN information_schema.constraint_column_usage AS ccu
+             ON ccu.constraint_name = tc.constraint_name
+            AND ccu.table_schema = tc.table_schema
+           WHERE tc.constraint_type = 'FOREIGN KEY'
+             ${whereClause}
+           ORDER BY from_schema, from_table, from_column`,
+          params,
+        );
+        return result.rows;
+      } catch (e) {
+        throw wrapError(e, "CATALOG_FAILED", `${type} getForeignKeys failed`, type);
+      }
+    },
+
+    async getViewDefinition(schema, view) {
+      let result;
+      try {
+        result = await pool.query(
+          `SELECT view_definition AS sql
+           FROM information_schema.views
+           WHERE table_schema = $1 AND table_name = $2`,
+          [schema, view],
+        );
+      } catch (e) {
+        throw wrapError(e, "CATALOG_FAILED", `${type} getViewDefinition failed`, type);
+      }
+      if (result.rows.length === 0) {
+        throw new WarehouseError(
+          "NOT_FOUND",
+          `View ${schema}.${view} not found in ${type}.`,
+          { warehouse: type },
+        );
+      }
+      return result.rows[0].sql;
+    },
+
     async close() {
       try {
         await pool.end();

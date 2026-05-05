@@ -13,9 +13,14 @@ const READER_TOOLS = new Set([
   "list_schemas",
   "list_tables",
   "describe_table",
+  "find_columns",
+  "get_foreign_keys",
+  "get_view_definition",
   "sample_table",
+  "count_rows",
   "column_stats",
   "top_values",
+  "time_series",
   "search_value",
 ]);
 

@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-05
+
+Adds five tools that turn the agent from "can run SQL you give it" into "can navigate an unfamiliar warehouse on its own." Existing tool surface unchanged; this is purely additive — no breaking changes for clients pinned to 0.1.x.
+
+### Added
+- **`find_columns`** — search column names across the warehouse with a SQL LIKE pattern. Answers *"where is `customer_email` stored?"* in one round-trip instead of N × `describe_table`.
+- **`count_rows`** — single `COUNT(*)` for a table. Cheap; lets the agent decide whether to `sample_table` or `query` based on actual size. Saves real money on per-byte cloud warehouses.
+- **`get_foreign_keys`** — declared FK relationships. The agent can now construct correct JOINs without guessing.
+- **`get_view_definition`** — return the SQL body of a view. In real warehouses, business logic lives in views; the agent couldn't reason about them before.
+- **`time_series`** — group by date column into hour/day/week/month/quarter/year buckets, count or aggregate per bucket. Dialect-correct everywhere — `DATE_TRUNC` / `TIMESTAMP_TRUNC` / `TRUNC` chosen automatically. Saves the agent from generating per-warehouse date SQL.
+- New `dateTrunc()` helper in `src/util/sqlDialect.js` for any future tool that needs time bucketing.
+- New `WarehouseAdapter` contract methods: `findColumns`, `getForeignKeys`, `getViewDefinition`. Implemented across all six adapters.
+
+### Notes
+- BigQuery's `find_columns` and `get_foreign_keys` require a schema (dataset) because `INFORMATION_SCHEMA` is per-dataset there. Project-wide search would mean iterating every dataset — out of scope for v0.2.
+- DuckDB's foreign-key reflection assumes the referenced schema equals the from-schema (DuckDB's `duckdb_constraints()` doesn't surface it).
+- Reader role can invoke all five new tools (still no admin-only tools).
+
+## [0.1.1] — 2026-05-05
+
+### Added
+- **MotherDuck cloud support** via the existing DuckDB adapter. Set `DUCKDB_PATH=md:<database_name>` and `MOTHERDUCK_TOKEN=<service-token>` to point the server at a MotherDuck-hosted database. The DuckDB driver auto-installs the `motherduck` extension on first connect; no new npm dependency. See [docs/adapters/duckdb.md](docs/adapters/duckdb.md).
+
+### Changed
+- **README docker matrix consolidated.** The "Docker against your own warehouse" section now shows a single fenced `bash` block covering all six warehouses (Postgres, Oracle, Snowflake, BigQuery, DuckDB, plus the Redshift note) instead of one example.
+
+### Fixed
+- **Release workflow's cosign step** was iterating per-tag with an interpolation that broke on the multi-line output of `docker/metadata-action` (newlines in the bash `for` loop). Cosign signatures attach to the digest and verify against any tag pointing at it, so we now sign once per build. Caught on the v0.1.0 release run.
+
+### Security
+- **`/secrets/` directory now in `.gitignore`** (root-anchored). Companion to the supported pattern of keeping per-warehouse env-file templates under `secrets/` for `--env-file` use. The leading `/` ensures `src/audit/`-style overmatches don't recur.
+
 ## [0.1.0] — initial release
 
 First end-to-end working version. Customers can install via Docker, npx, or directly from source, point an AI client at it, and run read-only analytical queries against any of the v1 warehouses.
@@ -34,5 +66,7 @@ First end-to-end working version. Customers can install via Docker, npx, or dire
 - **No native query timeout for DuckDB.** Documented; affects only the local-demo path.
 - **21 transitive npm vulnerabilities** from `snowflake-sdk`'s old AWS SDK chain. Tracked separately, not auto-fixed because forcing the update risks breaking known-good driver behavior.
 
-[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kalehdoo/warehouse-mcp/releases/tag/v0.1.0
