@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  docker-build:
+    name: Build + smoke-test image
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: warehouse-mcp:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-test the image
+        run: |
+          docker run -d --name wh-mcp-smoke \
+            -p 37301:3001 \
+            -e WAREHOUSE_TYPE=duckdb \
+            -e DUCKDB_PATH=:memory: \
+            -e MCP_SERVER_PORT=3001 \
+            -e MCP_SERVER_HOST=0.0.0.0 \
+            warehouse-mcp:ci
+          # Give the server a moment to bind.
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS http://127.0.0.1:37301/health > /tmp/health.json; then
+              break
+            fi
+            sleep 1
+          done
+          cat /tmp/health.json
+          grep -q '"server":"warehouse-mcp"' /tmp/health.json
+          grep -q '"warehouse":"duckdb"'    /tmp/health.json
+          docker logs wh-mcp-smoke
+          docker rm -f wh-mcp-smoke

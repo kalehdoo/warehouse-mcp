@@ -2,7 +2,7 @@
 
 Drop-in MCP (Model Context Protocol) server for your data warehouse. Read-only by default; ships safe SQL enforcement, bearer-token auth, and a JSONL audit log out of the box. Self-host the Docker image, or use the upcoming managed cloud variant.
 
-> **Status:** v0.1.0. Server, adapters, tool handlers, and the `init / start / doctor` CLI are in place. Packaging (Docker, CI/release) lands next.
+> **Status:** v0.1.0. Server, adapters, tool handlers, CLI, Docker image, and CI/release pipelines are in place. Hardening (testcontainers integration tests, threat model, rate limits) is next.
 
 ## Supported warehouses (v1)
 
@@ -23,6 +23,27 @@ Databricks SQL is a fast-follow.
 
 ## Quick start
 
+### Option A — Docker compose (5-minute demo with seeded Postgres)
+
+```bash
+git clone https://github.com/kalehdoo/warehouse-mcp.git
+cd warehouse-mcp
+docker compose up
+# server on http://localhost:3001, seeded ecommerce data in Postgres
+```
+
+### Option B — Docker against your own warehouse
+
+```bash
+docker run -d -p 3001:3001 \
+  -e WAREHOUSE_TYPE=postgres \
+  -e PG_HOST=… -e PG_DATABASE=… -e PG_USER=… -e PG_PASSWORD=… \
+  -e MCP_API_KEYS="$(openssl rand -hex 24):reader" \
+  ghcr.io/kalehdoo/warehouse-mcp:latest
+```
+
+### Option C — npx (no container)
+
 ```bash
 npx warehouse-mcp@latest init     # interactive setup; writes .env, prints Claude Desktop snippet
 npx warehouse-mcp doctor          # verify the connection without booting the server
@@ -32,6 +53,8 @@ npx warehouse-mcp start           # bind the MCP server to MCP_SERVER_PORT (defa
 Then point an AI client at it. Drop-in configs:
 - [Claude Desktop](docs/install-claude-desktop.md)
 - [Cursor](docs/install-cursor.md)
+- [Docker (production)](docs/deploy-docker.md)
+- [Kubernetes](docs/deploy-kubernetes.md)
 
 ## Local development
 
