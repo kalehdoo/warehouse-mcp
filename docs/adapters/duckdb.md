@@ -1,15 +1,36 @@
 # DuckDB adapter
 
-In-process DuckDB. Used for local development, demos, and as the smoke-test backend for the adapter contract suite. Production use is fine for read-only analysis of files (Parquet, CSV, JSON) without standing up a real warehouse.
+In-process DuckDB. Used for local development, demos, the smoke-test backend for the adapter contract suite, and as a thin client to **MotherDuck** (cloud-hosted DuckDB).
 
 ## Required env
 
 ```
 WAREHOUSE_TYPE=duckdb
 DUCKDB_PATH=:memory:           # or a file path: /data/analytics.duckdb
+                               # or MotherDuck:   md:<database_name>
 ```
 
-Use `:memory:` for ephemeral demos; use a file path for persistent data. Both work the same way through the adapter.
+Three modes, one adapter:
+
+| `DUCKDB_PATH` value | Mode | Persistence |
+|---|---|---|
+| `:memory:` | In-process, RAM only | Lost on restart |
+| `/data/demo.duckdb` | Local file (mount it from host) | Persistent |
+| `md:my_db` | **MotherDuck** cloud DB | Cloud-managed |
+
+## MotherDuck (cloud-hosted DuckDB)
+
+If you have a [MotherDuck](https://motherduck.com/) account, point the adapter at it via the `md:` prefix and add a service token:
+
+```
+WAREHOUSE_TYPE=duckdb
+DUCKDB_PATH=md:sample_data
+MOTHERDUCK_TOKEN=eyJhbG…   # from MotherDuck UI: Settings → Tokens → Service Account
+```
+
+The DuckDB driver auto-installs the `motherduck` extension on first connect — no extra setup. The token is sent only to MotherDuck and is never written to the audit log.
+
+For the built-in `sample_data` database (which every MotherDuck account ships with), you can immediately ask things like *"list the schemas"* — Claude will see `nyc`, `who`, `hn` and other public datasets to query.
 
 ## What works in v1
 
