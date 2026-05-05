@@ -97,7 +97,14 @@ export function createSnowflakeAdapter(config) {
   return {
     type: "snowflake",
 
-    async query(sql) {
+    async query(sql, opts) {
+      if (opts?.warehouseRole) {
+        throw new WarehouseError(
+          "UNSUPPORTED",
+          "Snowflake adapter does not support warehouse-role impersonation in v0.3. Use a per-key SNOWFLAKE_ROLE env-mapped key or wait for v0.3.x.",
+          { warehouse: "snowflake" },
+        );
+      }
       return run(sql, undefined, "QUERY_FAILED", "Snowflake query failed");
     },
 

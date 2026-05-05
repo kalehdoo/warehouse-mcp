@@ -50,7 +50,7 @@ export class JsonlAuditSink {
   }
 
   /**
-   * @param {{ctx: import("../auth/context.js").Context, tool: string, args?: object, sql?: string, rowCount?: number, durationMs?: number, error?: string, truncated?: boolean}} entry
+   * @param {{ctx: import("../auth/context.js").Context, tool: string, args?: object, sql?: string, rowCount?: number, durationMs?: number, error?: string, truncated?: boolean, guardrailEvents?: import("../guardrails/types.js").GuardrailEvent[]}} entry
    */
   write(entry) {
     const max = this.fieldMaxBytes;
@@ -59,6 +59,7 @@ export class JsonlAuditSink {
       tenant_id: entry.ctx.tenantId,
       principal: entry.ctx.principal,
       role: entry.ctx.role,
+      warehouse_role: entry.ctx.warehouseRole,
       request_id: entry.ctx.requestId,
       tool: entry.tool,
       sql: clipString(entry.sql, max),
@@ -66,6 +67,7 @@ export class JsonlAuditSink {
       duration_ms: entry.durationMs,
       truncated: entry.truncated,
       error: clipString(entry.error, max),
+      guardrail_events: entry.guardrailEvents,
     };
     try {
       this._ensureDir();

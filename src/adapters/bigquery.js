@@ -30,7 +30,14 @@ export function createBigQueryAdapter(config) {
   return {
     type: "bigquery",
 
-    async query(sql) {
+    async query(sql, opts) {
+      if (opts?.warehouseRole) {
+        throw new WarehouseError(
+          "UNSUPPORTED",
+          "BigQuery adapter does not support warehouse-role impersonation. Use distinct service accounts or IAM-conditioned access at the GCP layer.",
+          { warehouse: "bigquery" },
+        );
+      }
       let rows, job;
       try {
         [rows, job] = await client.query({

@@ -6,6 +6,7 @@ import { closeAllAdapters } from "./adapters/index.js";
 import { logger } from "./util/logger.js";
 import { maybeInitTracing } from "./observability/otel.js";
 import { TokenBucketRateLimiter } from "./security/rateLimit.js";
+import { buildGuardrailPipeline } from "./guardrails/index.js";
 
 async function main() {
   await maybeInitTracing("warehouse-mcp", "0.1.0");
@@ -17,6 +18,7 @@ async function main() {
     fieldMaxBytes: config.safety.auditFieldMaxBytes,
   });
   const rateLimiter = new TokenBucketRateLimiter(config.safety.rateLimitRpm);
+  const guardrails = buildGuardrailPipeline();
 
   const shutdown = async (signal) => {
     logger.info("shutting down", { signal });
@@ -28,9 +30,9 @@ async function main() {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 
   if (config.transport === "stdio") {
-    await startStdioTransport({ config, provider, audit, rateLimiter });
+    await startStdioTransport({ config, provider, audit, rateLimiter, guardrails });
   } else {
-    startHttpTransport({ config, provider, audit, rateLimiter });
+    startHttpTransport({ config, provider, audit, rateLimiter, guardrails });
   }
 }
 

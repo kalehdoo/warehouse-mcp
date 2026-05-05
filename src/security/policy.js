@@ -1,26 +1,48 @@
 /**
  * Role-based tool authorization.
  *
- * v1 ships two roles out of the box:
- *  - admin  — every tool, including future write tools (gated by ENABLE_WRITE_TOOLS)
- *  - reader — read-only catalog + query tools
+ * Four read tiers + admin, in order of increasing access:
  *
- * Roles can be customized via a security policy file in a future phase.
+ *   metadata_only    — schema/catalog discovery only. Never reads row data.
+ *                      For agents that need to "map" the warehouse without
+ *                      seeing actual values (compliance-heavy customers).
+ *
+ *   reader_restricted — metadata_only + aggregates / samples / time series.
+ *                      Sees data but only in aggregated or sampled form. No
+ *                      arbitrary SELECT, no literal-value search.
+ *
+ *   reader           — reader_restricted + arbitrary SELECT (`query`) and
+ *                      literal search (`search_value`). The "general analyst"
+ *                      tier; equivalent to v0.2.x's reader role.
+ *
+ *   admin            — every tool, including future write tools (gated by
+ *                      ENABLE_WRITE_TOOLS).
+ *
+ * Custom roles can be added later via a security policy file; for v0.3 these
+ * four cover the common ground.
  */
 
-const READER_TOOLS = new Set([
-  "query",
+const METADATA_TOOLS = new Set([
   "list_schemas",
   "list_tables",
   "describe_table",
   "find_columns",
   "get_foreign_keys",
   "get_view_definition",
+]);
+
+const RESTRICTED_READ_TOOLS = new Set([
+  ...METADATA_TOOLS,
   "sample_table",
   "count_rows",
   "column_stats",
   "top_values",
   "time_series",
+]);
+
+const READER_TOOLS = new Set([
+  ...RESTRICTED_READ_TOOLS,
+  "query",
   "search_value",
 ]);
 
@@ -30,10 +52,13 @@ const ADMIN_TOOLS = new Set([
 ]);
 
 const ROLE_TOOLS = {
-  admin: ADMIN_TOOLS,
+  metadata_only: METADATA_TOOLS,
+  reader_restricted: RESTRICTED_READ_TOOLS,
   reader: READER_TOOLS,
-  anonymous: READER_TOOLS,
+  admin: ADMIN_TOOLS,
 };
+
+export const VALID_ROLES = Object.keys(ROLE_TOOLS);
 
 export function isToolAllowed(role, toolName) {
   const allowed = ROLE_TOOLS[role];

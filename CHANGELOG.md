@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-05
+
+Adds the **guardrail pipeline** as load-bearing infrastructure for layered security, plus the first guardrail (output PII masking), a **four-tier role model**, and **warehouse-role impersonation** so the warehouse's own RLS / CLS / masking policies do their job under the right identity.
+
+### Added
+- **`src/guardrails/`** — pipeline runner (`runPre` / `runPost`), Guardrail interface, structured `GuardrailEvent` records that flow into the audit log. Guardrails are independent modules gated on individual env knobs; new layers plug in without touching tool handlers. Fail-closed semantics on pre-guardrail bugs (deny rather than slip through), fail-open on post-guardrail bugs (skip the transformer rather than poison the response).
+- **`outputPiiMask`** post-guardrail — role-aware redaction of result rows. Detects emails, SSNs, phones (formatted only — no false positives on raw digit strings), IPv4 addresses, and Luhn-validated credit cards. `admin` sees raw data, `reader` sees partial masks (`a***@example.com`), `reader_restricted` sees full redaction tags. Off by default; enable with `GUARDRAIL_PII_MASK=on`.
+- **Four-tier role model** (`src/security/policy.js`):
+  - `metadata_only` — catalog discovery only, never reads row data
+  - `reader_restricted` — aggregates / samples / time series, no arbitrary SELECT
+  - `reader` — adds `query` and `search_value` (the v0.2.x "reader" tier)
+  - `admin` — everything
+- **Warehouse-role impersonation** for Postgres and Redshift. API key syntax extended to `key:role:set_role=<warehouse_role>`. The adapter checks out a pool client, issues `SET ROLE`, runs the user query, then `RESET ROLE`. Warehouse-side RLS / CLS / masking now enforce per-MCP-key access without duplicating policy in MCP.
+- **API key parser** now returns `{role, warehouseRole}` instead of a bare role string. Backwards-compatible: bare `key:role` entries still parse correctly.
+- **GuardrailEvent records** in the audit log — structured JSON describing each guardrail's action (`allow` / `deny` / `approve_required` / `transform`) so SIEM tools can alert on patterns.
+- Identifier-validation guard rejects SQL-injection attempts in the `warehouseRole` field (`^[A-Za-z_][A-Za-z0-9_]*$`).
+- Threat model updated with a new "Defense in depth: guardrail pipeline" section and a new "Defense in depth: warehouse-role impersonation" section.
+
+### Changed
+- `Context.role` defaults are tightened: `dev-anonymous` admin (no auth configured) is the only path that grants admin without an explicit `MCP_API_KEYS` entry.
+- Catalog tools (`listSchemas`, `listTables`, `describeTable`, `findColumns`, `getForeignKeys`, `getViewDefinition`) intentionally do **not** honor `warehouseRole` — they read from `information_schema` which doesn't carry RLS in any of our supported warehouses. Data-reading tools (`query`, `sample_table`, `column_stats`, `top_values`, `time_series`, `search_value`, `count_rows`) all thread it through.
+
+### Architectural notes (deliberate non-features)
+- **Prompt injection detection** and **input PII redaction** are not in this release and never will be: warehouse-mcp doesn't see the LLM prompt, only the tool call the LLM produced. Detection at this layer would be security theater. Those concerns belong in the AI client (Claude Desktop, Cursor, custom agent).
+- **Sensitive-table policy at the MCP layer** is deferred. Customers should use warehouse-side RLS + the new `set_role=` impersonation instead. Will revisit only if a customer specifically can't (or won't) configure warehouse-side controls.
+- **Approval-required signal** is wired into the pipeline (a guardrail can return `approve_required` and it surfaces to the caller) but no guardrail emits it yet. Will land when a customer asks for the use case.
+
+### Tests
+- 122/122 unit tests pass (97 → 122, +25 new across roles, API key parser, pipeline, PII mask).
+- 13/13 integration tests pass against real Postgres via testcontainers, including 5 new impersonation tests proving warehouse-side RLS actually fires under the impersonated role and that `RESET ROLE` runs even on error paths.
+
 ## [0.2.0] — 2026-05-05
 
 Adds five tools that turn the agent from "can run SQL you give it" into "can navigate an unfamiliar warehouse on its own." Existing tool surface unchanged; this is purely additive — no breaking changes for clients pinned to 0.1.x.
@@ -66,7 +97,8 @@ First end-to-end working version. Customers can install via Docker, npx, or dire
 - **No native query timeout for DuckDB.** Documented; affects only the local-demo path.
 - **21 transitive npm vulnerabilities** from `snowflake-sdk`'s old AWS SDK chain. Tracked separately, not auto-fixed because forcing the update risks breaking known-good driver behavior.
 
-[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kalehdoo/warehouse-mcp/releases/tag/v0.1.0

@@ -42,13 +42,18 @@ export async function authenticate(req, provider) {
     return { ok: false, status: 401, error: "Missing Authorization: Bearer <token> header" };
   }
 
-  const role = apiKeys.get(token);
-  if (role) {
+  const entry = apiKeys.get(token);
+  if (entry) {
+    // The map stores either a bare role string (legacy v0.1.x callers / tests)
+    // or {role, warehouseRole} (v0.3+ format with optional impersonation).
+    const role = typeof entry === "string" ? entry : entry.role;
+    const warehouseRole = typeof entry === "string" ? undefined : entry.warehouseRole;
     return {
       ok: true,
       ctx: makeContext({
         tenantId,
         role,
+        warehouseRole,
         principal: `key_${token.slice(-6)}`,
       }),
     };
@@ -61,7 +66,8 @@ export async function authenticate(req, provider) {
         ok: true,
         ctx: makeContext({
           tenantId,
-          role: claims.role || "reader",
+          role: claims.role || "reader_restricted",
+          warehouseRole: claims.warehouse_role || undefined,
           principal: claims.sub || "jwt",
         }),
       };
