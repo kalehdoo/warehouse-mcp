@@ -21,6 +21,13 @@ function escapeLiteral(value) {
 
 export function createDuckDbAdapter(config) {
   const path = config.path || ":memory:";
+  // The DuckDB driver auto-loads the MotherDuck extension when the path
+  // starts with "md:" and reads the token from the motherduck_token env
+  // var. We thread it through config so the adapter constructor remains
+  // pure (no caller has to set the env var directly).
+  if (config.motherduckToken) {
+    process.env.motherduck_token = config.motherduckToken;
+  }
   let db, conn;
   try {
     db = new duckdb.Database(path);

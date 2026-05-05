@@ -99,9 +99,13 @@ function buildWarehouseConfig(env) {
         keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS || undefined,
       };
     case "duckdb":
+      // MOTHERDUCK_TOKEN is optional. When set, the DuckDB driver will use
+      // it to authenticate against MotherDuck-hosted databases (paths like
+      // "md:my_db"). Local file or in-memory paths ignore the token.
       return {
         type,
         path: process.env.DUCKDB_PATH || ":memory:",
+        motherduckToken: process.env.MOTHERDUCK_TOKEN || undefined,
       };
     default:
       return null;
