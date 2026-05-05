@@ -37,11 +37,43 @@ docker compose up
 
 ### Option B — Docker against your own warehouse
 
+The same image bundles every adapter; pick one with `WAREHOUSE_TYPE` plus the matching credentials. For credentials, prefer `--env-file` (or your secrets manager) over inline `-e` flags so passwords don't end up in shell history.
+
 ```bash
+# Postgres (REDSHIFT_* env vars for Redshift; same driver under the hood)
 docker run -d -p 3001:3001 \
   -e WAREHOUSE_TYPE=postgres \
-  -e PG_HOST=… -e PG_DATABASE=… -e PG_USER=… -e PG_PASSWORD=… \
+  -e PG_HOST=db -e PG_DATABASE=analytics -e PG_USER=mcp_reader -e PG_PASSWORD=... \
   -e MCP_API_KEYS="$(openssl rand -hex 24):reader" \
+  ghcr.io/kalehdoo/warehouse-mcp:latest
+
+# Oracle (Thin mode, no Instant Client)
+docker run -d -p 3001:3001 \
+  -e WAREHOUSE_TYPE=oracle \
+  -e ORACLE_USER=MCP_READER -e ORACLE_PASSWORD=... \
+  -e ORACLE_CONNECT_STRING="db.host:1521/SERVICE" \
+  ghcr.io/kalehdoo/warehouse-mcp:latest
+
+# Snowflake (key-pair, mount the .p8)
+docker run -d -p 3001:3001 \
+  -e WAREHOUSE_TYPE=snowflake \
+  -e SNOWFLAKE_ACCOUNT=xy12345.us-east-1 -e SNOWFLAKE_USER=MCP_READER \
+  -e SNOWFLAKE_PRIVATE_KEY_PATH=/keys/snowflake.p8 \
+  -e SNOWFLAKE_WAREHOUSE=COMPUTE_WH -e SNOWFLAKE_DATABASE=ANALYTICS \
+  -v /opt/keys:/keys:ro \
+  ghcr.io/kalehdoo/warehouse-mcp:latest
+
+# BigQuery (mount the service-account JSON)
+docker run -d -p 3001:3001 \
+  -e WAREHOUSE_TYPE=bigquery \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/keys/bq-sa.json \
+  -e BIGQUERY_PROJECT=my-gcp-project \
+  -v /opt/keys:/keys:ro \
+  ghcr.io/kalehdoo/warehouse-mcp:latest
+
+# DuckDB (file or in-memory)
+docker run -d -p 3001:3001 \
+  -e WAREHOUSE_TYPE=duckdb -e DUCKDB_PATH=:memory: \
   ghcr.io/kalehdoo/warehouse-mcp:latest
 ```
 

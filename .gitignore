@@ -2,6 +2,10 @@ node_modules/
 .env
 .env.local
 .env.*.local
+# Local credentials live in /secrets/. Never commit anything in there.
+# Leading slash anchors to repo root so a `secrets/` dir elsewhere
+# (e.g. inside docs) wouldn't be silently excluded.
+/secrets/
 *.log
 # Runtime audit logs only — leading slash anchors to repo root so that
 # src/audit/ and test/audit/ (source code dirs) are NOT excluded.
