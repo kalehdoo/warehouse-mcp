@@ -40,6 +40,8 @@ function buildConnectionOpts(config) {
     database: config.database,
     schema: config.schema,
     role: config.role,
+    // Cancels the request at the Snowflake side if it exceeds this many ms.
+    timeout: config.timeoutMs || 30_000,
   };
 }
 

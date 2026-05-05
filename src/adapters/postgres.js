@@ -24,6 +24,10 @@ function buildPoolConfig(config) {
     max: config.maxConnections || 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
+    // Cancels the query at the server after this many ms (statement_timeout).
+    // Adapter-wide; per-tool override is a v1.x concern.
+    query_timeout: config.timeoutMs || 30_000,
+    statement_timeout: config.timeoutMs || 30_000,
   };
 }
 

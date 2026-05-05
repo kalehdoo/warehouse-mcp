@@ -24,8 +24,14 @@ const BaseEnvSchema = z.object({
   QUERY_DEFAULT_LIMIT: z.coerce.number().int().positive().default(1000),
   QUERY_HARD_MAX_LIMIT: z.coerce.number().int().positive().default(10000),
   QUERY_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+  // Result-cap and rate-limit additions for hardening (Phase 7).
+  // 0 disables either limit. Defaults are picked to be cautious but not
+  // surprising for typical analytical queries.
+  QUERY_MAX_RESULT_CELLS: z.coerce.number().int().nonnegative().default(100_000),
+  MCP_RATE_LIMIT_RPM: z.coerce.number().int().nonnegative().default(0),
   AUDIT_DIR: z.string().default("./audit"),
   AUDIT_ROTATION: z.enum(["daily", "off"]).default("daily"),
+  AUDIT_FIELD_MAX_BYTES: z.coerce.number().int().positive().default(4096),
 });
 
 function parseApiKeys(raw) {
@@ -125,6 +131,9 @@ export function loadConfig(env = process.env) {
       defaultLimit: parsed.QUERY_DEFAULT_LIMIT,
       hardMaxLimit: parsed.QUERY_HARD_MAX_LIMIT,
       timeoutMs: parsed.QUERY_TIMEOUT_MS,
+      maxResultCells: parsed.QUERY_MAX_RESULT_CELLS,
+      rateLimitRpm: parsed.MCP_RATE_LIMIT_RPM,
+      auditFieldMaxBytes: parsed.AUDIT_FIELD_MAX_BYTES,
     },
     audit: {
       dir: parsed.AUDIT_DIR,
@@ -151,7 +160,9 @@ export class EnvConfigProvider {
     if (!this.config.warehouse) {
       throw new Error("WAREHOUSE_TYPE is not configured. Set it in .env.");
     }
-    return this.config.warehouse;
+    // Merge per-process safety knobs so adapters can pass them straight to
+    // their drivers (statement_timeout, callTimeout, jobTimeoutMs, etc.).
+    return { ...this.config.warehouse, timeoutMs: this.config.safety.timeoutMs };
   }
   getApiKeys() {
     return this.config.auth.apiKeys;
