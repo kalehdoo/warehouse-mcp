@@ -1,8 +1,11 @@
 # warehouse-mcp
 
+[![CI](https://github.com/kalehdoo/warehouse-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/kalehdoo/warehouse-mcp/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
 Drop-in MCP (Model Context Protocol) server for your data warehouse. Read-only by default; ships safe SQL enforcement, bearer-token auth, and a JSONL audit log out of the box. Self-host the Docker image, or use the upcoming managed cloud variant.
 
-> **Status:** v0.1.0. Server, adapters, tool handlers, CLI, Docker image, CI/release pipelines, threat model, and safety rails (rate limit, query timeout, result cap) are in place. Customer onboarding polish is the only thing left before tagging 1.0.
+> **Status:** v0.1.0 — feature-complete and ready for first customer onboarding. See [CHANGELOG.md](CHANGELOG.md) for what shipped.
 
 ## Supported warehouses (v1)
 
@@ -56,6 +59,8 @@ Then point an AI client at it. Drop-in configs:
 - [Docker (production)](docs/deploy-docker.md)
 - [Kubernetes](docs/deploy-kubernetes.md)
 
+For a step-by-step walkthrough from "I have a warehouse" to "Claude is querying it", see [docs/onboarding.md](docs/onboarding.md). For common errors, see [docs/troubleshooting.md](docs/troubleshooting.md).
+
 ## Local development
 
 ```bash
@@ -72,7 +77,11 @@ Off by default. Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318/v1/t
 
 ## Security
 
-Read [docs/threat-model.md](docs/threat-model.md) before deploying. It covers the OWASP Top 10 mapping, what the codebase mitigates, and what is left to your deployment (TLS, secrets management, network isolation, cost guardrails). Report vulnerabilities via GitHub Security Advisory.
+Read [docs/threat-model.md](docs/threat-model.md) before deploying. It covers the OWASP Top 10 mapping, what the codebase mitigates, and what is left to your deployment (TLS, secrets management, network isolation, cost guardrails). Report vulnerabilities per [SECURITY.md](SECURITY.md).
+
+## Contributing
+
+Issues and PRs welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) — it covers the dev workflow, the adapter contract, and how to add a new warehouse. By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
