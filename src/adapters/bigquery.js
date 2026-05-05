@@ -33,7 +33,12 @@ export function createBigQueryAdapter(config) {
     async query(sql) {
       let rows, job;
       try {
-        [rows, job] = await client.query({ query: sql, location: config.location || "US" });
+        [rows, job] = await client.query({
+          query: sql,
+          location: config.location || "US",
+          // BigQuery aborts the job server-side after this many ms.
+          jobTimeoutMs: config.timeoutMs || 30_000,
+        });
       } catch (e) {
         throw wrapError(e, "QUERY_FAILED", "BigQuery query failed", "bigquery");
       }

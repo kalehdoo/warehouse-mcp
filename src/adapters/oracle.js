@@ -56,6 +56,10 @@ export function createOracleAdapter(config) {
     } catch (e) {
       throw wrapError(e, "CONNECTION_FAILED", "Failed to get Oracle connection", "oracle");
     }
+    if (config.timeoutMs) {
+      // oracledb cancels the round-trip if the call takes longer than this.
+      conn.callTimeout = config.timeoutMs;
+    }
     try {
       return await fn(conn);
     } catch (e) {

@@ -11,8 +11,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest",
+    "test": "vitest run --passWithNoTests --exclude '**/node_modules/**' --exclude 'test/integration/**'",
+    "test:watch": "vitest --exclude '**/node_modules/**' --exclude 'test/integration/**'",
+    "test:integration": "vitest run --passWithNoTests --testTimeout=120000 test/integration",
     "lint": "eslint src bin",
     "format": "prettier --write ."
   },

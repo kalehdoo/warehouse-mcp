@@ -3,7 +3,9 @@ node_modules/
 .env.local
 .env.*.local
 *.log
-audit/
+# Runtime audit logs only — leading slash anchors to repo root so that
+# src/audit/ and test/audit/ (source code dirs) are NOT excluded.
+/audit/
 dist/
 coverage/
 .DS_Store

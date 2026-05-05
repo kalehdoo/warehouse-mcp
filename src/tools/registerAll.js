@@ -1,6 +1,7 @@
 import { TOOL_DEFINITIONS } from "./index.js";
 import { assertToolAllowed } from "../security/policy.js";
 import { withSpan } from "../observability/otel.js";
+import { applyResultCap } from "../util/resultCap.js";
 
 /**
  * Register all v1 tools on the given McpServer instance.
@@ -8,7 +9,11 @@ import { withSpan } from "../observability/otel.js";
  *
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
  * @param {import("../auth/context.js").Context} ctx
- * @param {{provider: object, audit?: import("../audit/jsonlSink.js").JsonlAuditSink}} deps
+ * @param {{
+ *   provider: object,
+ *   audit?: import("../audit/jsonlSink.js").JsonlAuditSink,
+ *   rateLimiter?: import("../security/rateLimit.js").TokenBucketRateLimiter,
+ * }} deps
  */
 export function registerAllTools(server, ctx, deps = {}) {
   for (const def of TOOL_DEFINITIONS) {
@@ -25,13 +30,17 @@ export function registerAllTools(server, ctx, deps = {}) {
             const startedAt = Date.now();
             try {
               assertToolAllowed(ctx, def.name);
-              const result = await def.handler(args, ctx, deps);
+              deps.rateLimiter?.charge(ctx.principal);
+              let result = await def.handler(args, ctx, deps);
+              const maxCells = deps.provider?.getSafetyConfig?.()?.maxResultCells ?? 0;
+              result = applyResultCap(result, maxCells);
               deps.audit?.write({
                 ctx,
                 tool: def.name,
                 rowCount:
                   result?.rows?.length ?? result?.hits?.length ?? result?.values?.length,
                 durationMs: Date.now() - startedAt,
+                truncated: result?.truncated || undefined,
               });
               return {
                 content: [

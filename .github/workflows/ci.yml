@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Nightly integration tests against the real-Postgres testcontainer.
+    # Kept off the PR path because pulling postgres:16 + spinning the
+    # container adds 30+ s, which is slow for routine PRs.
+    - cron: "0 6 * * *"
 
 permissions:
   contents: read
@@ -61,3 +66,17 @@ jobs:
           grep -q '"warehouse":"duckdb"'    /tmp/health.json
           docker logs wh-mcp-smoke
           docker rm -f wh-mcp-smoke
+
+  integration:
+    name: Integration tests (testcontainers)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run test:integration

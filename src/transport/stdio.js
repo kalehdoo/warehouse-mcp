@@ -9,15 +9,15 @@ import { logger } from "../util/logger.js";
  * Auth doesn't apply over stdio — the OS-level process boundary is the
  * trust boundary, so we synthesize an admin context from the configured tenant.
  *
- * @param {{config: object, provider: object, audit?: object}} deps
+ * @param {{config: object, provider: object, audit?: object, rateLimiter?: object}} deps
  */
-export async function startStdioTransport({ config, provider, audit }) {
+export async function startStdioTransport({ config, provider, audit, rateLimiter }) {
   const ctx = makeContext({
     tenantId: config.tenant.defaultTenantId,
     role: "admin",
     principal: "stdio-local",
   });
-  const server = buildServer(ctx, { provider, audit });
+  const server = buildServer(ctx, { provider, audit, rateLimiter });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   logger.info("stdio transport ready", {

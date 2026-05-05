@@ -25,9 +25,9 @@ function applyCors(req, res, allowedOrigins) {
  *  - A fresh McpServer is built per session, bound to the auth Context, so
  *    role/tenant/principal flow through every tool invocation without globals.
  *
- * @param {{config: object, provider: object, audit?: object}} deps
+ * @param {{config: object, provider: object, audit?: object, rateLimiter?: object}} deps
  */
-export function startHttpTransport({ config, provider, audit }) {
+export function startHttpTransport({ config, provider, audit, rateLimiter }) {
   /** @type {Map<string, {transport: StreamableHTTPServerTransport, ctx: object}>} */
   const sessions = new Map();
 
@@ -76,7 +76,7 @@ export function startHttpTransport({ config, provider, audit }) {
     }
 
     const ctx = auth.ctx;
-    const mcpServer = buildServer(ctx, { provider, audit });
+    const mcpServer = buildServer(ctx, { provider, audit, rateLimiter });
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () =>
         `session_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`,

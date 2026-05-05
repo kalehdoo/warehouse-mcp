@@ -2,7 +2,7 @@
 
 Drop-in MCP (Model Context Protocol) server for your data warehouse. Read-only by default; ships safe SQL enforcement, bearer-token auth, and a JSONL audit log out of the box. Self-host the Docker image, or use the upcoming managed cloud variant.
 
-> **Status:** v0.1.0. Server, adapters, tool handlers, CLI, Docker image, and CI/release pipelines are in place. Hardening (testcontainers integration tests, threat model, rate limits) is next.
+> **Status:** v0.1.0. Server, adapters, tool handlers, CLI, Docker image, CI/release pipelines, threat model, and safety rails (rate limit, query timeout, result cap) are in place. Customer onboarding polish is the only thing left before tagging 1.0.
 
 ## Supported warehouses (v1)
 
@@ -69,6 +69,10 @@ cp .env.example .env
 ## Optional: OpenTelemetry tracing
 
 Off by default. Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318/v1/traces` in your env and the server will emit per-tool-call spans (resource attributes: `service.name=warehouse-mcp`, `service.version=0.1.0`; span attributes: `warehouse.tenant`, `warehouse.role`).
+
+## Security
+
+Read [docs/threat-model.md](docs/threat-model.md) before deploying. It covers the OWASP Top 10 mapping, what the codebase mitigates, and what is left to your deployment (TLS, secrets management, network isolation, cost guardrails). Report vulnerabilities via GitHub Security Advisory.
 
 ## License
 
