@@ -110,6 +110,97 @@ export function createBigQueryAdapter(config) {
       return this.query(`SELECT * FROM ${ref} LIMIT ${limit}`);
     },
 
+    async findColumns(pattern, { schema } = {}) {
+      // BigQuery's INFORMATION_SCHEMA is per-dataset, not project-wide. If the
+      // caller scopes to one schema we can hit one INFORMATION_SCHEMA. Without
+      // a schema we'd have to loop across datasets — for v1 we require schema
+      // when scanning BigQuery to keep cost bounded.
+      if (!schema) {
+        throw new WarehouseError(
+          "UNSUPPORTED",
+          "BigQuery findColumns requires a schema (dataset). Project-wide search is not supported in v1.",
+          { warehouse: "bigquery" },
+        );
+      }
+      const safe = String(pattern).replace(/'/g, "''");
+      const result = await this.query(
+        `SELECT table_schema AS schema, table_name AS \`table\`,
+                column_name AS \`column\`, data_type AS \`type\`
+         FROM \`${config.projectId}.${schema}.INFORMATION_SCHEMA.COLUMNS\`
+         WHERE LOWER(column_name) LIKE LOWER('${safe}')
+         ORDER BY table_name, column_name`,
+      );
+      return result.rows;
+    },
+
+    async getForeignKeys({ schema, table } = {}) {
+      // BigQuery only supports informational PK/FK constraints. They live in
+      // INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE. Most BigQuery tables
+      // don't declare them at all; we return [] in that case rather than
+      // erroring, so the agent gets a stable signal.
+      if (!schema) {
+        throw new WarehouseError(
+          "UNSUPPORTED",
+          "BigQuery getForeignKeys requires a schema (dataset).",
+          { warehouse: "bigquery" },
+        );
+      }
+      const conds = [`tc.constraint_type = 'FOREIGN KEY'`];
+      if (table) {
+        const t = String(table).replace(/'/g, "''");
+        conds.push(`tc.table_name = '${t}'`);
+      }
+      try {
+        const result = await this.query(
+          `SELECT tc.table_schema AS from_schema,
+                  tc.table_name   AS from_table,
+                  kcu.column_name AS from_column,
+                  ccu.table_schema AS to_schema,
+                  ccu.table_name   AS to_table,
+                  ccu.column_name  AS to_column,
+                  tc.constraint_name
+           FROM \`${config.projectId}.${schema}.INFORMATION_SCHEMA.TABLE_CONSTRAINTS\` tc
+           JOIN \`${config.projectId}.${schema}.INFORMATION_SCHEMA.KEY_COLUMN_USAGE\` kcu
+             ON tc.constraint_name = kcu.constraint_name
+           JOIN \`${config.projectId}.${schema}.INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE\` ccu
+             ON ccu.constraint_name = tc.constraint_name
+           WHERE ${conds.join(" AND ")}
+           ORDER BY tc.table_name, kcu.column_name`,
+        );
+        return result.rows;
+      } catch (e) {
+        // BigQuery FK metadata is GA but some legacy projects / regions may
+        // lack the views — return [] gracefully rather than failing the call.
+        if (/INFORMATION_SCHEMA|not found|does not exist/i.test(e.message || "")) return [];
+        throw e;
+      }
+    },
+
+    async getViewDefinition(schema, view) {
+      let metadata;
+      try {
+        [metadata] = await client.dataset(schema).table(view).getMetadata();
+      } catch (e) {
+        if (e.code === 404) {
+          throw new WarehouseError(
+            "NOT_FOUND",
+            `View ${schema}.${view} not found in BigQuery.`,
+            { warehouse: "bigquery", cause: e },
+          );
+        }
+        throw wrapError(e, "CATALOG_FAILED", "BigQuery getViewDefinition failed", "bigquery");
+      }
+      const sql = metadata?.view?.query;
+      if (!sql) {
+        throw new WarehouseError(
+          "NOT_FOUND",
+          `${schema}.${view} is not a view (or has no SQL definition).`,
+          { warehouse: "bigquery" },
+        );
+      }
+      return sql;
+    },
+
     async close() {
       // BigQuery client uses HTTPS keep-alive under the hood; no explicit close needed.
     },

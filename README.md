@@ -20,9 +20,19 @@ Drop-in MCP (Model Context Protocol) server for your data warehouse. Read-only b
 
 Databricks SQL is a fast-follow.
 
-## Tools exposed (v1, all read-only)
+## Tools exposed (read-only)
 
-`query`, `list_schemas`, `list_tables`, `describe_table`, `sample_table`, `column_stats`, `top_values`, `search_value`.
+| Tool | Purpose |
+|---|---|
+| `query` | Execute a SELECT (validator-enforced read-only) |
+| `list_schemas`, `list_tables`, `describe_table` | Browse the catalog |
+| `find_columns` | Search column names across the warehouse with a LIKE pattern |
+| `get_foreign_keys` | Discover declared FK relationships for safe joins |
+| `get_view_definition` | Read the SQL body of a view (where business logic lives) |
+| `sample_table`, `count_rows` | Peek at data, check size before scanning |
+| `column_stats`, `top_values` | Profile a single column |
+| `time_series` | Bucket by hour/day/week/month/quarter/year — dialect-correct everywhere |
+| `search_value` | Find a literal across a table's text columns |
 
 ## Quick start
 

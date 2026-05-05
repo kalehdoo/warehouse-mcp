@@ -12,6 +12,21 @@
  * @property {string} name
  * @property {"table"|"view"} [kind]
  *
+ * @typedef {object} ColumnMatch
+ * @property {string} schema
+ * @property {string} table
+ * @property {string} column
+ * @property {string} type
+ *
+ * @typedef {object} ForeignKeyEdge
+ * @property {string} from_schema
+ * @property {string} from_table
+ * @property {string} from_column
+ * @property {string} to_schema
+ * @property {string} to_table
+ * @property {string} to_column
+ * @property {string} [constraint_name]
+ *
  * @typedef {object} QueryResult
  * @property {ColumnMeta[]} columns
  * @property {Array<Record<string, unknown>>} rows
@@ -23,6 +38,9 @@
  * @property {(schema: string) => Promise<TableMeta[]>} listTables
  * @property {(schema: string, table: string) => Promise<ColumnMeta[]>} describeTable
  * @property {(schema: string, table: string, n: number) => Promise<QueryResult>} sample
+ * @property {(pattern: string, opts?: {schema?: string}) => Promise<ColumnMatch[]>} findColumns
+ * @property {(opts?: {schema?: string, table?: string}) => Promise<ForeignKeyEdge[]>} getForeignKeys
+ * @property {(schema: string, view: string) => Promise<string>} getViewDefinition
  * @property {() => Promise<void>} close
  */
 export {};
