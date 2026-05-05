@@ -1,4 +1,4 @@
-import { TOOL_DEFINITIONS } from "./stubs.js";
+import { TOOL_DEFINITIONS } from "./index.js";
 import { assertToolAllowed } from "../security/policy.js";
 
 /**
@@ -7,7 +7,7 @@ import { assertToolAllowed } from "../security/policy.js";
  *
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
  * @param {import("../auth/context.js").Context} ctx
- * @param {{audit?: import("../audit/jsonlSink.js").JsonlAuditSink}} deps
+ * @param {{provider: object, audit?: import("../audit/jsonlSink.js").JsonlAuditSink}} deps
  */
 export function registerAllTools(server, ctx, deps = {}) {
   for (const def of TOOL_DEFINITIONS) {
@@ -25,12 +25,15 @@ export function registerAllTools(server, ctx, deps = {}) {
           deps.audit?.write({
             ctx,
             tool: def.name,
-            rowCount: result?.rows?.length,
+            rowCount: result?.rows?.length ?? result?.hits?.length ?? result?.values?.length,
             durationMs: Date.now() - startedAt,
           });
           return {
             content: [
-              { type: "text", text: typeof result === "string" ? result : JSON.stringify(result, null, 2) },
+              {
+                type: "text",
+                text: typeof result === "string" ? result : JSON.stringify(result, null, 2),
+              },
             ],
           };
         } catch (e) {

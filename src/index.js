@@ -20,7 +20,7 @@ async function main() {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 
   if (config.transport === "stdio") {
-    await startStdioTransport({ config, audit });
+    await startStdioTransport({ config, provider, audit });
   } else {
     startHttpTransport({ config, provider, audit });
   }

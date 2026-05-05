@@ -29,9 +29,10 @@ export function runAdapterContract(name, setup) {
       expect(adapter.type).toBe(ctx.dialect);
     });
 
-    it("listSchemas includes the seeded schema", async () => {
+    it("listSchemas includes the seeded schema and returns unique names", async () => {
       const schemas = await adapter.listSchemas();
       expect(schemas).toContain(schema);
+      expect(new Set(schemas).size).toBe(schemas.length);
     });
 
     it("listTables returns the seeded table with kind='table'", async () => {
