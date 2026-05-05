@@ -54,18 +54,61 @@ export function createPostgresAdapter(config, overrides = {}) {
   return {
     type,
 
-    async query(sql) {
-      let result;
-      try {
-        result = await pool.query(sql);
-      } catch (e) {
-        throw wrapError(e, "QUERY_FAILED", `${type} query failed`, type);
+    async query(sql, opts = {}) {
+      // Without warehouseRole the fast path runs on the pool directly — one
+      // round-trip. With warehouseRole we check out a client, issue SET ROLE,
+      // run the user query, RESET ROLE, then release the client back to the
+      // pool. Three round-trips total, but the warehouse's own RLS / CLS /
+      // masking policies now evaluate under the impersonated identity.
+      if (!opts.warehouseRole) {
+        let result;
+        try {
+          result = await pool.query(sql);
+        } catch (e) {
+          throw wrapError(e, "QUERY_FAILED", `${type} query failed`, type);
+        }
+        const columns = (result.fields || []).map((f) => ({
+          name: f.name,
+          type: pgTypeName(f.dataTypeID),
+        }));
+        return { columns, rows: result.rows };
       }
-      const columns = (result.fields || []).map((f) => ({
-        name: f.name,
-        type: pgTypeName(f.dataTypeID),
-      }));
-      return { columns, rows: result.rows };
+
+      // Reject anything that doesn't look like a plain SQL identifier so an
+      // attacker can't smuggle SQL through the warehouseRole field even if
+      // upstream sanitization is bypassed.
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(opts.warehouseRole)) {
+        throw new WarehouseError(
+          "PERMISSION_DENIED",
+          `Invalid warehouseRole identifier: ${opts.warehouseRole}`,
+          { warehouse: type },
+        );
+      }
+
+      let client;
+      try {
+        client = await pool.connect();
+      } catch (e) {
+        throw wrapError(e, "CONNECTION_FAILED", `${type} client checkout failed`, type);
+      }
+      try {
+        await client.query(`SET ROLE "${opts.warehouseRole}"`);
+        const result = await client.query(sql);
+        const columns = (result.fields || []).map((f) => ({
+          name: f.name,
+          type: pgTypeName(f.dataTypeID),
+        }));
+        return { columns, rows: result.rows };
+      } catch (e) {
+        throw wrapError(e, "QUERY_FAILED", `${type} query failed (role=${opts.warehouseRole})`, type);
+      } finally {
+        try {
+          await client.query("RESET ROLE");
+        } catch {
+          // best effort — pool will discard the client if it errored
+        }
+        client.release();
+      }
     },
 
     async listSchemas() {
@@ -129,10 +172,11 @@ export function createPostgresAdapter(config, overrides = {}) {
       }));
     },
 
-    async sample(schema, table, n) {
+    async sample(schema, table, n, opts) {
       const limit = Math.max(1, Math.min(n, 100));
       return this.query(
         `SELECT * FROM ${quoteIdent(schema)}.${quoteIdent(table)} LIMIT ${limit}`,
+        opts,
       );
     },
 

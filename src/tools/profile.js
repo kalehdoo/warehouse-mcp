@@ -21,7 +21,9 @@ export const sampleTableTool = {
   },
   async handler(args, ctx, deps) {
     const adapter = await getAdapter(ctx, deps.provider);
-    return adapter.sample(args.schema, args.table, args.n || 10);
+    return adapter.sample(args.schema, args.table, args.n || 10, {
+      warehouseRole: ctx.warehouseRole,
+    });
   },
 };
 
@@ -65,7 +67,7 @@ export const columnStatsTool = {
       ` ${avgExpr} AS avg_value` +
       ` FROM ${tbl} ${limitClause(1, dialect)}`;
     assertReadOnly(sql);
-    const result = await adapter.query(sql);
+    const result = await adapter.query(sql, { warehouseRole: ctx.warehouseRole });
     return {
       schema: args.schema,
       table: args.table,
@@ -99,7 +101,7 @@ export const topValuesTool = {
       ` ORDER BY COUNT(*) DESC` +
       ` ${limitClause(args.k, dialect)}`;
     assertReadOnly(sql);
-    const result = await adapter.query(sql);
+    const result = await adapter.query(sql, { warehouseRole: ctx.warehouseRole });
     return {
       schema: args.schema,
       table: args.table,
@@ -123,7 +125,7 @@ export const countRowsTool = {
     const tbl = qualifiedTable(args.schema, args.table, dialect);
     const sql = `SELECT COUNT(*) AS row_count FROM ${tbl}`;
     assertReadOnly(sql);
-    const result = await adapter.query(sql);
+    const result = await adapter.query(sql, { warehouseRole: ctx.warehouseRole });
     const raw = result.rows[0]?.row_count ?? result.rows[0]?.ROW_COUNT;
     return {
       schema: args.schema,
@@ -189,7 +191,7 @@ export const timeSeriesTool = {
       ` ${limitClause(limit, dialect)}`;
 
     assertReadOnly(sql);
-    const result = await adapter.query(sql);
+    const result = await adapter.query(sql, { warehouseRole: ctx.warehouseRole });
     return {
       schema: args.schema,
       table: args.table,

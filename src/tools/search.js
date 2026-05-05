@@ -57,7 +57,7 @@ export const searchValueTool = {
     const sql = wrapped.join(" UNION ALL ") + ` ${limitClause(MAX_RESULT_ROWS, dialect)}`;
 
     assertReadOnly(sql);
-    const result = await adapter.query(sql);
+    const result = await adapter.query(sql, { warehouseRole: ctx.warehouseRole });
     return {
       schema: args.schema,
       table: args.table,

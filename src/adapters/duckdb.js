@@ -39,7 +39,14 @@ export function createDuckDbAdapter(config) {
   return {
     type: "duckdb",
 
-    async query(sql) {
+    async query(sql, opts) {
+      if (opts?.warehouseRole) {
+        throw new WarehouseError(
+          "UNSUPPORTED",
+          "DuckDB adapter does not support warehouse-role impersonation. Use Postgres or Redshift for this feature.",
+          { warehouse: "duckdb" },
+        );
+      }
       let rows;
       try {
         rows = await runAll(conn, sql);

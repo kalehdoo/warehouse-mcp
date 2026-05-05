@@ -34,15 +34,33 @@ const BaseEnvSchema = z.object({
   AUDIT_FIELD_MAX_BYTES: z.coerce.number().int().positive().default(4096),
 });
 
+/**
+ * Parse MCP_API_KEYS into a Map<token, {role, options}>.
+ *
+ * Format (backwards-compatible):
+ *   key1:reader                                — basic
+ *   key2:reader:set_role=alice_finance         — with warehouse-role impersonation
+ *   key3:reader_restricted:set_role=audit_ro   — multiple options separated by colons
+ *
+ * Each segment after the role is `name=value`. Unknown options are ignored
+ * silently (so future options don't break old parsers).
+ */
 function parseApiKeys(raw) {
   const map = new Map();
   for (const part of raw.split(",")) {
-    const trimmed = part.trim();
-    if (!trimmed.includes(":")) continue;
-    const idx = trimmed.indexOf(":");
-    const token = trimmed.slice(0, idx);
-    const role = trimmed.slice(idx + 1);
-    if (token && role) map.set(token, role);
+    const segments = part.trim().split(":");
+    if (segments.length < 2) continue;
+    const [token, role, ...rest] = segments;
+    if (!token || !role) continue;
+    const options = {};
+    for (const segment of rest) {
+      const eq = segment.indexOf("=");
+      if (eq <= 0) continue;
+      const name = segment.slice(0, eq).trim();
+      const value = segment.slice(eq + 1).trim();
+      if (name === "set_role") options.warehouseRole = value;
+    }
+    map.set(token, { role, ...options });
   }
   return map;
 }

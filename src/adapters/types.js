@@ -31,9 +31,17 @@
  * @property {ColumnMeta[]} columns
  * @property {Array<Record<string, unknown>>} rows
  *
+ * @typedef {object} QueryOptions
+ * @property {string} [warehouseRole]  When set, the adapter issues `SET ROLE` (or
+ *                                     equivalent) on the connection before running
+ *                                     the SQL, so warehouse-side RLS / CLS / masking
+ *                                     policies are evaluated under that identity.
+ *                                     Supported on Postgres + Redshift today.
+ *                                     Other adapters throw UNSUPPORTED if asked.
+ *
  * @typedef {object} WarehouseAdapter
  * @property {"postgres"|"oracle"|"redshift"|"snowflake"|"bigquery"|"duckdb"} type
- * @property {(sql: string) => Promise<QueryResult>} query
+ * @property {(sql: string, opts?: QueryOptions) => Promise<QueryResult>} query
  * @property {() => Promise<string[]>} listSchemas
  * @property {(schema: string) => Promise<TableMeta[]>} listTables
  * @property {(schema: string, table: string) => Promise<ColumnMeta[]>} describeTable

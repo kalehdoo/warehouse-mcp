@@ -76,7 +76,14 @@ export function createOracleAdapter(config) {
   return {
     type: "oracle",
 
-    async query(sql) {
+    async query(sql, opts) {
+      if (opts?.warehouseRole) {
+        throw new WarehouseError(
+          "UNSUPPORTED",
+          "Oracle adapter does not support warehouse-role impersonation in v0.3 (use proxy-auth setup at the database side instead).",
+          { warehouse: "oracle" },
+        );
+      }
       return withConnection(
         async (conn) => {
           const result = await conn.execute(sql, [], { resultSet: false });

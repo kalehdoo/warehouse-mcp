@@ -105,6 +105,58 @@ The MCP server is *not* internet-exposed by design. The reverse proxy is what yo
 
 ---
 
+## Defense in depth: the guardrail pipeline (v0.3+)
+
+Every tool call passes through an ordered pipeline (`src/guardrails/pipeline.js`) of pre- and post-guardrails before/after the tool handler runs. Each guardrail is an independent module gated on its own env flag — disabling a layer doesn't affect the others, and adding a new layer doesn't require touching any tool handler.
+
+Pipeline runs in this order per call:
+
+```
+auth -> rate limit -> guardrails.runPre -> tool handler -> result cap -> guardrails.runPost -> audit
+```
+
+### Pre-guardrails (currently registerable)
+
+None ship enabled in v0.3.0. The pipeline runner is in place; future deny / approve_required guardrails (sensitive-table policy, approval threshold) plug in here.
+
+### Post-guardrails
+
+| Guardrail | Env knob | What it does |
+|---|---|---|
+| `output_pii_mask` | `GUARDRAIL_PII_MASK=on` | Role-aware redaction of result rows (emails, SSNs, phones, IPs, Luhn-validated credit cards). `admin` sees raw, `reader` sees partial masks (`a***@example.com`), `reader_restricted` sees full redaction tags (`[REDACTED:email]`). |
+
+Every guardrail emits a structured `GuardrailEvent` to the audit log so SIEM tools can alert on patterns.
+
+**Failure semantics.** A buggy pre-guardrail throws → pipeline fails *closed* (denies the call) rather than letting the tool run. A buggy post-guardrail throws → pipeline logs the failure and skips that transformer; the response still goes back. Pre = stricter than post because skipping a deny is unsafe; skipping a transform is just a degraded UX.
+
+## Defense in depth: warehouse-role impersonation (v0.3+)
+
+For Postgres and Redshift, an API key can carry an optional `set_role=<warehouse_role>` directive. When set, the adapter checks out a pool client, issues `SET ROLE`, runs the user query, then `RESET ROLE` and releases the client. This makes the warehouse's own RLS / CLS / column-masking policies enforce per-MCP-key access — without duplicating those policies inside MCP.
+
+```
+MCP_API_KEYS=alice_key:reader:set_role=alice_finance,bob_key:reader:set_role=bob_audit_ro
+```
+
+Why this matters: the most common deployment is a single shared service account (`mcp_reader`) with broad SELECT. Without impersonation, every MCP role sees the same data. With impersonation, the warehouse can apply different RLS / CLS to alice vs bob even though both come through the same connection pool.
+
+**Adapters that support it:** Postgres, Redshift.
+**Adapters that reject `set_role` with a clear error:** DuckDB, Oracle, Snowflake, BigQuery (different auth models — see [docs/adapters/](adapters/) for each warehouse's recommended approach to per-user isolation).
+
+The `warehouseRole` value is validated as a SQL identifier (`^[A-Za-z_][A-Za-z0-9_]*$`) before being interpolated, so an attacker can't smuggle SQL through the role field.
+
+### Roles (v0.3+)
+
+| Role | Allowed |
+|---|---|
+| `metadata_only` | Catalog discovery only — never reads row data |
+| `reader_restricted` | Aggregates / samples / time series — no arbitrary SELECT |
+| `reader` | Adds `query` and `search_value` (full read) |
+| `admin` | Everything; future write tools when `ENABLE_WRITE_TOOLS` ships |
+
+Roles are enforced at the dispatcher level (`src/security/policy.js`) before any guardrail runs, so a metadata_only key cannot trigger a sensitive guardrail evaluation by trying to call `query`.
+
+---
+
 ## What is *not* in scope
 
 These are real concerns; they live at the deployment layer, not in this codebase.

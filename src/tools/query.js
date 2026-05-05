@@ -23,6 +23,6 @@ export const queryTool = {
       defaultLimit: args.max_rows ?? safety.defaultLimit,
       maxLimit: safety.hardMaxLimit,
     });
-    return adapter.query(safe);
+    return adapter.query(safe, { warehouseRole: ctx.warehouseRole });
   },
 };
