@@ -2,16 +2,18 @@
 
 Drop-in MCP (Model Context Protocol) server for your data warehouse. Read-only by default; ships safe SQL enforcement, bearer-token auth, and a JSONL audit log out of the box. Self-host the Docker image, or use the upcoming managed cloud variant.
 
-> **Status:** v0.1.0 scaffolding. Real implementation lands in Phase 2 of the build plan.
+> **Status:** v0.1.0. Server core, transports, security, and warehouse adapters are in place. Tool handlers (Phase 4) and CLI (Phase 5) are next.
 
 ## Supported warehouses (v1)
 
-- Postgres
-- Oracle (Thin mode — no Instant Client required)
-- Redshift
-- Snowflake
-- BigQuery
-- DuckDB (local demo / dev)
+| Warehouse | Adapter docs |
+|---|---|
+| Postgres 12+ | [docs/adapters/postgres.md](docs/adapters/postgres.md) |
+| Oracle 12c+ (Thin mode, no Instant Client) | [docs/adapters/oracle.md](docs/adapters/oracle.md) |
+| Amazon Redshift (cluster + Serverless) | [docs/adapters/redshift.md](docs/adapters/redshift.md) |
+| Snowflake (key-pair auth) | [docs/adapters/snowflake.md](docs/adapters/snowflake.md) |
+| Google BigQuery | [docs/adapters/bigquery.md](docs/adapters/bigquery.md) |
+| DuckDB (local demo / dev) | [docs/adapters/duckdb.md](docs/adapters/duckdb.md) |
 
 Databricks SQL is a fast-follow.
 
