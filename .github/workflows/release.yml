@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.0). Must already exist."
+        required: true
+
+permissions:
+  contents: write   # draft GitHub release
+  packages: write   # push to GHCR
+  id-token: write   # cosign keyless signing
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  publish-image:
+    name: Build, push, sign, SBOM
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: version
+        name: Resolve tag
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION"   >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"           >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.tag }}
+            type=semver,pattern={{major}},value=${{ steps.version.outputs.tag }}
+            type=raw,value=latest
+
+      - id: build
+        name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (keyless via Sigstore)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          for tag in ${{ steps.meta.outputs.tags }}; do
+            cosign sign --yes "${tag}@${DIGEST}"
+          done
+
+      - name: Generate SBOM (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx-json
+          output-file: warehouse-mcp-${{ steps.version.outputs.version }}-sbom.cdx.json
+
+      - name: Upload SBOM as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: warehouse-mcp-${{ steps.version.outputs.version }}-sbom.cdx.json
+
+  publish-npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: publish-image
+    if: ${{ vars.PUBLISH_NPM == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  github-release:
+    name: Draft GitHub release
+    runs-on: ubuntu-latest
+    needs: publish-image
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom
+
+      - name: Generate release notes from commits
+        id: notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          {
+            echo "## warehouse-mcp ${{ needs.publish-image.outputs.version }}"
+            echo
+            echo "### Image"
+            echo "- \`${{ env.IMAGE_NAME }}:${{ needs.publish-image.outputs.version }}\`"
+            echo "- Signed with Sigstore (cosign keyless). Verify:"
+            echo "  \`\`\`"
+            echo "  cosign verify ${{ env.IMAGE_NAME }}:${{ needs.publish-image.outputs.version }} \\\\"
+            echo "    --certificate-identity-regexp 'https://github.com/${{ github.repository }}' \\\\"
+            echo "    --certificate-oidc-issuer https://token.actions.githubusercontent.com"
+            echo "  \`\`\`"
+            echo
+            echo "### SBOM"
+            echo "Attached as a release asset (CycloneDX JSON)."
+            echo
+            echo "### Changes"
+            if [ -n "$PREV_TAG" ]; then
+              git log --pretty=format:'- %s (%h)' "$PREV_TAG"..HEAD
+            else
+              git log --pretty=format:'- %s (%h)' HEAD
+            fi
+          } > release-notes.md
+          cat release-notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: warehouse-mcp ${{ needs.publish-image.outputs.version }}
+          body_path: release-notes.md
+          draft: true
+          files: |
+            warehouse-mcp-${{ needs.publish-image.outputs.version }}-sbom.cdx.json
