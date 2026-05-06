@@ -1,6 +1,7 @@
 {
   "name": "warehouse-mcp",
-  "version": "0.3.2",
+  "version": "0.3.3",
+  "mcpName": "io.github.kalehdoo/warehouse-mcp",
   "description": "Production MCP server for your data warehouse. Read-only enforcement, role-based access, audit log. Postgres, Oracle, Snowflake, BigQuery, Redshift, DuckDB, MotherDuck.",
   "license": "Apache-2.0",
   "type": "module",
