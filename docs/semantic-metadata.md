@@ -109,7 +109,27 @@ terms:
 
 The `sql_definition` is the most powerful field. When the agent sees a question that maps to a glossary term that has SQL, it has a known-correct starting point — it doesn't have to invent the predicate.
 
-### `<schema>.yml` (or any name except `glossary.yml`) — table docs
+### `schemas.yml` — schema-level docs (v0.4.1+)
+
+One file per warehouse, at the root of `SEMANTIC_DIR`. Tells the AI what each warehouse schema is *for*, not just what tables it contains. Without it, the agent has to infer the purpose of `finance` vs `raw_finance` vs `staging_finance` from naming alone — brittle.
+
+```yaml
+version: 1
+schemas:
+  - name: <schema_name>           # warehouse schema this entry describes
+    description: |
+      What kind of data lives in this schema. Source of truth for what?
+      Anything an analyst would want to know in the first 30 seconds.
+    owner: <team>                 # optional
+    purpose: mart                 # raw | staging | intermediate | mart | snapshot | reference
+    refresh: hourly               # realtime | hourly | daily | weekly | monthly | manual | view
+    sensitivity: medium           # low | medium | high | secret
+    glossary_terms: [<term>]      # related glossary entries
+```
+
+A schema can appear in `schemas.yml` even if no tables are documented in it yet — useful when you want to advertise a schema's existence and purpose before filling in per-table docs. The schema appears in `warehouse://semantic/schemas/list` regardless of whether tables have been documented.
+
+### `<schema>.yml` (or any name except `glossary.yml` / `schemas.yml`) — table docs
 
 Format follows dbt's `schema.yml` v2 spec:
 

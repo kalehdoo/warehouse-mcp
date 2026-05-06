@@ -1,0 +1,46 @@
+# Schema-level documentation — one file per SEMANTIC_DIR.
+#
+# Tells the AI what each warehouse schema is FOR (not just what tables it
+# contains). Without this, the agent has to guess from schema names alone:
+#   "finance" — what kind? raw extracts? mart? source of truth for revenue?
+#
+# With this, the agent reads each schema's purpose, owner, sensitivity,
+# refresh cadence, and related glossary terms before deciding which schema
+# to query.
+#
+# Exposed via:
+#   warehouse://semantic/schemas/list           — all schemas, one payload
+#   warehouse://semantic/schemas/<schema>       — single schema's doc + table list
+
+version: 1
+
+schemas:
+  - name: finance
+    description: |
+      All transactional financial data — invoices, customer payments,
+      refunds, daily reconciled summaries. Source of truth for revenue
+      reporting; do NOT use raw_finance for analytics.
+    owner: finance-platform-team
+    purpose: mart
+    refresh: hourly
+    sensitivity: medium
+    glossary_terms: [revenue, fiscal_year]
+
+  - name: raw_finance
+    description: |
+      Untyped extracts from the billing source system. Useful for
+      debugging upstream data issues. Do NOT query for analytics —
+      use finance.* instead.
+    owner: data-platform-team
+    purpose: raw
+    refresh: realtime
+    sensitivity: medium
+
+  - name: hr
+    description: |
+      Employee master data + organizational structure. PII-sensitive;
+      access tightly controlled by warehouse-side grants.
+    owner: hr-data-team
+    purpose: mart
+    refresh: daily
+    sensitivity: high

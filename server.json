@@ -6,13 +6,13 @@
     "url": "https://github.com/kalehdoo/warehouse-mcp",
     "source": "github"
   },
-  "version": "0.4.0",
+  "version": "0.4.1",
   "websiteUrl": "https://github.com/kalehdoo/warehouse-mcp",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "warehouse-mcp",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "transport": {
         "type": "stdio"
       },

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-05-06
+
+Adds **schema-level documentation** as a first-class file shape — `schemas.yml` at the root of `SEMANTIC_DIR` describes what each warehouse schema is *for*, who owns it, refresh cadence, and sensitivity. The agent's `warehouse://semantic/schemas/list` and `warehouse://semantic/schemas/{schema}` resources now include this richer overview instead of just enumerating tables. Closes the "schema-level docs gap" called out as deferred in v0.4.0.
+
+### Added
+- **`SchemasFileSchema`** in `src/semantic/schema.js` — zod schema for the new format. Same `purpose` / `refresh` / `sensitivity` enum vocabulary as `ModelMeta`, so customers learn one mental model and apply it at two levels.
+- **Loader detection** of `schemas.yml` (case-insensitive). Indexes schema docs into a new `schemaDocs` Map. Fail-fast collision check if the same schema is documented twice.
+- **Resource enrichment** — `warehouse://semantic/schemas/list` now includes each schema's description, owner, purpose, refresh cadence, sensitivity, and related glossary terms when present. `warehouse://semantic/schemas/{schema}` returns the same fields plus the table list. When a schema is documented but has no tables yet, it still appears in the list (advertise the schema before filling in per-table docs).
+- **Resource description text** updated for both schemas resources to be informative without being prescriptive — *"Schema overview — what each documented schema in the warehouse is for, who owns it, refresh cadence, sensitivity. Useful for understanding the warehouse layout before drilling into specific tables."* No directives like "READ THIS FIRST" — the agent decides whether to fetch.
+- **Template** at `docs/semantic-templates/schemas.yml` showing the format with realistic finance / raw_finance / hr examples.
+- **`docs/semantic-metadata.md`** gains a section describing `schemas.yml` alongside the existing `glossary.yml` and `<schema>.yml` sections.
+
+### Changed
+- `summarize()` output now includes a `documented schemas` count, e.g. `"8 glossary terms, 4 documented schemas, 4 tables across 4 schemas"`. Visible in `doctor` output and the boot log.
+- `package.json` and `server.json` versions → 0.4.1.
+
+### Notes
+- **No MCP Prompts shipped.** Considered and explicitly deferred — would impose a workflow on the agent that some users would find restrictive. The product stance is "trust the agent like you'd trust a smart human; provide good docs and let it decide what to read." Resource descriptions are purely informational.
+- The schema-doc layer is **purely additive**. Customers who don't write a `schemas.yml` see the v0.4.0 behavior unchanged — `warehouse://semantic/schemas/list` continues to enumerate tables.
+
 ## [0.4.0] — 2026-05-06
 
 Adds the **semantic-metadata layer** — optional YAML files describing the warehouse's business glossary and table semantics, exposed to AI clients as MCP **resources** (the third MCP primitive, never used before in this project). When a customer fills in the metadata, the agent stops guessing what "revenue" or "active customer" means and starts reading the customer's actual definitions.
@@ -167,7 +187,8 @@ First end-to-end working version. Customers can install via Docker, npx, or dire
 - **No native query timeout for DuckDB.** Documented; affects only the local-demo path.
 - **21 transitive npm vulnerabilities** from `snowflake-sdk`'s old AWS SDK chain. Tracked separately, not auto-fixed because forcing the update risks breaking known-good driver behavior.
 
-[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.2...v0.3.3
