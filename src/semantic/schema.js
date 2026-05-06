@@ -1,8 +1,10 @@
 /**
  * Zod schemas for the semantic-metadata YAML format.
  *
- * Two file shapes:
+ * Three file shapes:
  *   - glossary.yml   — business-glossary terms (one per file, one file total)
+ *   - schemas.yml    — schema-level docs: what each warehouse schema is for
+ *                      (one per file, one file total, lives at SEMANTIC_DIR root)
  *   - <anything>.yml — dbt-style schema.yml describing models (tables) + columns
  *
  * The format is intentionally a near-superset of dbt's schema.yml so that
@@ -94,9 +96,36 @@ export const GlossaryFileSchema = z.object({
   terms: z.array(GlossaryTerm).default([]),
 });
 
+/**
+ * Schema-level documentation file. Lives in `schemas.yml` at the root of
+ * SEMANTIC_DIR. Describes what each warehouse schema is *for* — purpose,
+ * owner, refresh, sensitivity, related glossary terms. Lets the AI agent
+ * pick the right schema for a question instead of guessing from names.
+ *
+ * Same enum vocabulary as ModelMeta (purpose/refresh/sensitivity), so
+ * customers learn one mental model and apply it at two levels.
+ */
+const SchemaDoc = z.object({
+  name: Identifier,
+  description: z.string().min(1),
+  owner: z.string().optional(),
+  refresh: z
+    .enum(["realtime", "hourly", "daily", "weekly", "monthly", "manual", "view"])
+    .optional(),
+  sensitivity: z.enum(["low", "medium", "high", "secret"]).optional(),
+  purpose: z.enum(["raw", "staging", "intermediate", "mart", "snapshot", "reference"]).optional(),
+  glossary_terms: z.array(Identifier).optional(),
+});
+
+export const SchemasFileSchema = z.object({
+  version: z.literal(1),
+  schemas: z.array(SchemaDoc).default([]),
+});
+
 // ── Exports for consumers ─────────────────────────────────────────────────
 
 export const TYPES = {
   ModelsFileSchema,
   GlossaryFileSchema,
+  SchemasFileSchema,
 };

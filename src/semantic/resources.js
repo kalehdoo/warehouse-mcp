@@ -66,15 +66,30 @@ export function registerSemanticResources(server, index) {
     "warehouse://semantic/schemas/list",
     {
       description:
-        "Index of all documented schemas in the warehouse with each schema's purpose and table count. Like the table of contents — start here to know which schema to read in detail.",
+        "Schema overview — what each documented schema in the warehouse is for, who owns it, refresh cadence, sensitivity, and table count. Useful for understanding the warehouse layout before drilling into specific tables. Includes the schema-level docs from schemas.yml when present.",
       mimeType: MIME_JSON,
     },
     async (uri) => {
-      const schemas = Array.from(index.schemas.entries()).map(([name, tables]) => ({
-        name,
-        table_count: tables.length,
-        tables: tables.map((t) => t.name),
-      }));
+      const schemas = Array.from(index.schemas.entries()).map(([name, tables]) => {
+        const doc = index.schemaDocs.get(name);
+        return {
+          name,
+          // Schema-level docs from schemas.yml (when present) come first so the
+          // agent learns the schemas purpose, not just its inventory.
+          ...(doc
+            ? {
+                description: doc.description,
+                owner: doc.owner,
+                purpose: doc.purpose,
+                refresh: doc.refresh,
+                sensitivity: doc.sensitivity,
+                glossary_terms: doc.glossary_terms,
+              }
+            : {}),
+          table_count: tables.length,
+          tables: tables.map((t) => t.name),
+        };
+      });
       return jsonResource(uri, { schemas });
     },
   );
@@ -100,16 +115,29 @@ export function registerSemanticResources(server, index) {
     new ResourceTemplate("warehouse://semantic/schemas/{schema}", { list: undefined }),
     {
       description:
-        "Documentation for one schema — its purpose, owner, and the tables it contains. Read this after the schemas-list to understand a specific domain before drilling into tables.",
+        "Documentation for one schema — its purpose, owner, refresh cadence, sensitivity, and the tables it contains. Includes the schema-level doc from schemas.yml when present.",
       mimeType: MIME_JSON,
     },
     async (uri, { schema }) => {
       const tables = index.schemas.get(schema);
-      if (!tables) return notFound(uri, `Schema '${schema}' has no semantic documentation.`);
+      const doc = index.schemaDocs.get(schema);
+      if (!tables && !doc) {
+        return notFound(uri, `Schema '${schema}' has no semantic documentation.`);
+      }
       return jsonResource(uri, {
         schema,
-        table_count: tables.length,
-        tables: tables.map((t) => ({
+        ...(doc
+          ? {
+              description: doc.description,
+              owner: doc.owner,
+              purpose: doc.purpose,
+              refresh: doc.refresh,
+              sensitivity: doc.sensitivity,
+              glossary_terms: doc.glossary_terms,
+            }
+          : {}),
+        table_count: (tables || []).length,
+        tables: (tables || []).map((t) => ({
           name: t.name,
           description: t.description,
           purpose: t.meta?.purpose,

@@ -1,13 +1,18 @@
 /**
  * Semantic-metadata loader.
  *
- * Walks SEMANTIC_DIR recursively, parses every *.yml / *.yaml as either the
- * glossary file (filename === "glossary.yml") or a dbt-style models file,
- * validates against the zod schema, and merges into an in-memory index that
- * resources.js queries against.
+ * Walks SEMANTIC_DIR recursively, parses every *.yml / *.yaml as one of three
+ * file shapes:
+ *   - glossary.yml — business-glossary terms (one file at the root)
+ *   - schemas.yml  — schema-level docs (one file at the root)
+ *   - everything else — dbt-style schema.yml describing models (tables) + columns
+ *
+ * Each file is validated against the matching zod schema, then merged into an
+ * in-memory index that resources.js queries against.
  *
  * Errors at startup if:
- *   - the same glossary term name appears in more than one place
+ *   - the same glossary term appears in more than one place
+ *   - the same schema is documented twice (schemas.yml + duplicate)
  *   - the same (schema, table) appears in more than one models file
  *   - any file fails schema validation
  *
@@ -17,11 +22,12 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
 import yaml from "js-yaml";
-import { ModelsFileSchema, GlossaryFileSchema } from "./schema.js";
+import { ModelsFileSchema, GlossaryFileSchema, SchemasFileSchema } from "./schema.js";
 
 /** @typedef {{ name: string, definition: string, sql_definition?: string, related_terms?: string[], tags?: string[] }} GlossaryTerm */
+/** @typedef {{ name: string, description: string, owner?: string, refresh?: string, sensitivity?: string, purpose?: string, glossary_terms?: string[] }} SchemaDoc */
 /** @typedef {{ name: string, description: string, meta: object, columns: object[] }} TableDoc */
-/** @typedef {{ glossary: Map<string, GlossaryTerm>, tables: Map<string, TableDoc>, schemas: Map<string, TableDoc[]> }} SemanticIndex */
+/** @typedef {{ glossary: Map<string, GlossaryTerm>, schemaDocs: Map<string, SchemaDoc>, tables: Map<string, TableDoc>, schemas: Map<string, TableDoc[]> }} SemanticIndex */
 
 const YAML_EXTS = new Set([".yml", ".yaml"]);
 
@@ -58,6 +64,13 @@ function parseYaml(filePath) {
   }
 }
 
+function classify(filePath) {
+  const name = basename(filePath).toLowerCase();
+  if (name === "glossary.yml" || name === "glossary.yaml") return "glossary";
+  if (name === "schemas.yml" || name === "schemas.yaml") return "schemas";
+  return "models";
+}
+
 /**
  * Load the entire SEMANTIC_DIR into an index.
  *
@@ -68,15 +81,16 @@ export function loadSemanticDir(dir) {
   const files = walkYamlFiles(dir);
 
   const glossary = new Map();
+  const schemaDocs = new Map();
   const tables = new Map();
-  const sourceMap = new Map(); // (schema.table or term name) -> originating file, for collision messages
+  const sourceMap = new Map(); // (kind:key) -> originating file, for collision messages
 
   for (const filePath of files) {
-    const isGlossary = basename(filePath).toLowerCase() === "glossary.yml";
+    const kind = classify(filePath);
     const data = parseYaml(filePath);
     if (data == null) continue; // empty file is allowed
 
-    if (isGlossary) {
+    if (kind === "glossary") {
       const parsed = GlossaryFileSchema.safeParse(data);
       if (!parsed.success) {
         throw new Error(
@@ -96,6 +110,27 @@ export function loadSemanticDir(dir) {
       continue;
     }
 
+    if (kind === "schemas") {
+      const parsed = SchemasFileSchema.safeParse(data);
+      if (!parsed.success) {
+        throw new Error(
+          `Schema validation failed for ${filePath}:\n${parsed.error.toString()}`,
+        );
+      }
+      for (const doc of parsed.data.schemas) {
+        const existing = sourceMap.get(`schema:${doc.name}`);
+        if (existing) {
+          throw new Error(
+            `Schema '${doc.name}' documented in both ${existing} and ${filePath}.`,
+          );
+        }
+        schemaDocs.set(doc.name, doc);
+        sourceMap.set(`schema:${doc.name}`, filePath);
+      }
+      continue;
+    }
+
+    // kind === "models"
     const parsed = ModelsFileSchema.safeParse(data);
     if (!parsed.success) {
       throw new Error(
@@ -116,6 +151,8 @@ export function loadSemanticDir(dir) {
   }
 
   // Derive schemas index — maps schema name to its tables.
+  // A schema can appear in schemaDocs without any tables (and vice versa) —
+  // unioning the keys keeps both kinds of partial documentation visible.
   const schemas = new Map();
   for (const model of tables.values()) {
     const schemaName = model.meta.schema;
@@ -123,13 +160,21 @@ export function loadSemanticDir(dir) {
     list.push(model);
     schemas.set(schemaName, list);
   }
+  for (const docName of schemaDocs.keys()) {
+    if (!schemas.has(docName)) schemas.set(docName, []);
+  }
 
-  return { glossary, tables, schemas };
+  return { glossary, schemaDocs, tables, schemas };
 }
 
 /** Build an empty index — used when SEMANTIC_DIR is unset (no semantic resources). */
 export function emptyIndex() {
-  return { glossary: new Map(), tables: new Map(), schemas: new Map() };
+  return {
+    glossary: new Map(),
+    schemaDocs: new Map(),
+    tables: new Map(),
+    schemas: new Map(),
+  };
 }
 
 /**
@@ -137,5 +182,8 @@ export function emptyIndex() {
  * @param {SemanticIndex} index
  */
 export function summarize(index) {
-  return `${index.glossary.size} glossary terms, ${index.tables.size} tables across ${index.schemas.size} schemas`;
+  return (
+    `${index.glossary.size} glossary terms, ${index.schemaDocs.size} documented schemas, ` +
+    `${index.tables.size} tables across ${index.schemas.size} schemas`
+  );
 }

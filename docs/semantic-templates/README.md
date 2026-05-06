@@ -23,6 +23,7 @@ This directory contains starter templates for the optional semantic-metadata lay
 | File | What it documents |
 |---|---|
 | `glossary.yml` | Business terms (`active_customer`, `revenue`, `mrr`, etc.) — the agent's dictionary for understanding the domain language |
+| `schemas.yml` | Schema-level docs (one entry per warehouse schema) — what each schema is for, who owns it, refresh cadence, sensitivity. The agent's "table of contents" view of the warehouse. |
 | `finance.yml` | Tables in the `finance` schema — descriptions, columns, types, sensitivity tags |
 
 ## Layout — your call
