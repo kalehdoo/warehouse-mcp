@@ -46,6 +46,8 @@ Databricks SQL is a fast-follow.
 
 Per-key role assigned via `MCP_API_KEYS=key:role[:set_role=warehouse_role]`. The optional `set_role=` directive issues `SET ROLE` on Postgres/Redshift so the warehouse's own RLS / CLS / masking policies enforce per-key access — no policy duplication in MCP.
 
+For deployments with multiple existing DB roles (finance, hr, payroll, etc.) and many human users, see [docs/multi-role-deployment.md](https://github.com/kalehdoo/warehouse-mcp/blob/main/docs/multi-role-deployment.md) — walks through mapping ~10 DB roles to MCP keys, the recommended `<area>` / `<area>_restricted` pattern, and when to graduate from static keys to OIDC.
+
 ## Quick start
 
 ### Option A — Docker compose (5-minute demo with seeded Postgres)
