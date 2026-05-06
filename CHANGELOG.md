@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-05-06
+
+Tooling release. No behavior changes; ships a guardrail in the release workflow plus the npm-publish prep that should have landed in v0.3.1.
+
+### Added
+- **Tag/version-mismatch guard in `release.yml`** — fails the workflow fast if the git tag doesn't match the `version` in `package.json`. Catches the v0.1.3-tag-but-package-says-0.3.1 mistake from the first publish before any minutes are spent on docker build / cosign / SBOM. Compares `node -p "require('./package.json').version"` to the parsed tag and exits 1 with a clear remediation message if they disagree.
+
+### Changed
+- `package.json` version → 0.3.2 to match this tag.
+
+### Notes
+- v0.3.1 was published to npm under git tag `v0.1.3` due to a tag/package mismatch. The published bits are correct (the 0.3.1 code); only the git tag name is misleading. The new guard prevents this class of mistake going forward.
+
 ## [0.3.0] — 2026-05-05
 
 Adds the **guardrail pipeline** as load-bearing infrastructure for layered security, plus the first guardrail (output PII masking), a **four-tier role model**, and **warehouse-role impersonation** so the warehouse's own RLS / CLS / masking policies do their job under the right identity.
@@ -97,7 +110,8 @@ First end-to-end working version. Customers can install via Docker, npx, or dire
 - **No native query timeout for DuckDB.** Documented; affects only the local-demo path.
 - **21 transitive npm vulnerabilities** from `snowflake-sdk`'s old AWS SDK chain. Tracked separately, not auto-fixed because forcing the update risks breaking known-good driver behavior.
 
-[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.0...v0.3.2
 [0.3.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.1.0...v0.1.1
