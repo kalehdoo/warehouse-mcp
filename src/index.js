@@ -7,9 +7,10 @@ import { logger } from "./util/logger.js";
 import { maybeInitTracing } from "./observability/otel.js";
 import { TokenBucketRateLimiter } from "./security/rateLimit.js";
 import { buildGuardrailPipeline } from "./guardrails/index.js";
+import { loadSemantic, summarize as summarizeSemantic } from "./semantic/index.js";
 
 async function main() {
-  await maybeInitTracing("warehouse-mcp", "0.1.0");
+  await maybeInitTracing("warehouse-mcp", "0.4.0");
   const config = loadConfig();
   const provider = new EnvConfigProvider(config);
   const audit = new JsonlAuditSink({
@@ -19,6 +20,14 @@ async function main() {
   });
   const rateLimiter = new TokenBucketRateLimiter(config.safety.rateLimitRpm);
   const guardrails = buildGuardrailPipeline();
+
+  const semanticResult = loadSemantic({ dir: config.semantic.dir });
+  if (semanticResult.enabled) {
+    logger.info("semantic loaded", { dir: config.semantic.dir, summary: summarizeSemantic(semanticResult.index) });
+  } else if (semanticResult.missingDir) {
+    logger.warn("semantic dir does not exist; semantic resources disabled", { dir: semanticResult.missingDir });
+  }
+  const semantic = semanticResult.index;
 
   const shutdown = async (signal) => {
     logger.info("shutting down", { signal });
@@ -30,9 +39,9 @@ async function main() {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 
   if (config.transport === "stdio") {
-    await startStdioTransport({ config, provider, audit, rateLimiter, guardrails });
+    await startStdioTransport({ config, provider, audit, rateLimiter, guardrails, semantic });
   } else {
-    startHttpTransport({ config, provider, audit, rateLimiter, guardrails });
+    startHttpTransport({ config, provider, audit, rateLimiter, guardrails, semantic });
   }
 }
 

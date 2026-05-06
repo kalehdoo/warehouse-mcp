@@ -99,6 +99,22 @@ function checkAuditWritable(config) {
   }
 }
 
+async function checkSemantic(config) {
+  if (!config?.semantic?.dir) {
+    return ok("Semantic dir", "not configured (optional — set SEMANTIC_DIR to enable)");
+  }
+  try {
+    const { loadSemantic, summarize } = await import("../semantic/index.js");
+    const result = loadSemantic({ dir: config.semantic.dir });
+    if (!result.enabled && result.missingDir) {
+      return fail("Semantic dir", `${result.missingDir} does not exist`);
+    }
+    return ok("Semantic dir loaded", summarize(result.index));
+  } catch (e) {
+    return fail("Semantic dir", e.message);
+  }
+}
+
 function checkAuth(config) {
   const apiKeys = config?.auth?.apiKeys?.size || 0;
   const oidc = Boolean(config?.auth?.oidc);
@@ -125,6 +141,7 @@ export async function doctorCommand() {
     }
     results.push(checkAuditWritable(config));
     results.push(checkAuth(config));
+    results.push(await checkSemantic(config));
   }
   const allGreen = results.every(Boolean);
   process.stdout.write(`\n${allGreen ? GREEN : RED}${allGreen ? "All checks passed." : "One or more checks failed."}${RESET}\n`);

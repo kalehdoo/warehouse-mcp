@@ -11,13 +11,13 @@ import { logger } from "../util/logger.js";
  *
  * @param {{config: object, provider: object, audit?: object, rateLimiter?: object, guardrails?: object}} deps
  */
-export async function startStdioTransport({ config, provider, audit, rateLimiter, guardrails }) {
+export async function startStdioTransport({ config, provider, audit, rateLimiter, guardrails, semantic }) {
   const ctx = makeContext({
     tenantId: config.tenant.defaultTenantId,
     role: "admin",
     principal: "stdio-local",
   });
-  const server = buildServer(ctx, { provider, audit, rateLimiter, guardrails });
+  const server = buildServer(ctx, { provider, audit, rateLimiter, guardrails, semantic });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   logger.info("stdio transport ready", {

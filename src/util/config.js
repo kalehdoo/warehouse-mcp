@@ -32,6 +32,10 @@ const BaseEnvSchema = z.object({
   AUDIT_DIR: z.string().default("./audit"),
   AUDIT_ROTATION: z.enum(["daily", "off"]).default("daily"),
   AUDIT_FIELD_MAX_BYTES: z.coerce.number().int().positive().default(4096),
+  // Semantic metadata — points at a directory of YAML files describing the
+  // warehouse (business glossary + table/column docs). Optional. When set,
+  // warehouse-mcp exposes the contents as MCP resources at warehouse://semantic/*.
+  SEMANTIC_DIR: z.string().default(""),
 });
 
 /**
@@ -160,6 +164,9 @@ export function loadConfig(env = process.env) {
     audit: {
       dir: parsed.AUDIT_DIR,
       rotation: parsed.AUDIT_ROTATION,
+    },
+    semantic: {
+      dir: parsed.SEMANTIC_DIR || undefined,
     },
     warehouse: buildWarehouseConfig(parsed),
   };

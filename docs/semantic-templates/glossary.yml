@@ -1,0 +1,96 @@
+# Business glossary — defines the terms your business uses.
+#
+# Why it matters: when a user asks "show me revenue from active customers",
+# the AI agent doesn't know what YOUR business means by "revenue" or
+# "active customer". This file is where you tell it.
+#
+# Lives at the root of SEMANTIC_DIR. There's only one glossary.yml per
+# warehouse. It's loaded at startup and exposed at:
+#   warehouse://semantic/glossary           — all terms
+#   warehouse://semantic/glossary/<name>    — one term
+
+version: 1
+
+terms:
+  # Concrete metric definitions — these are the most valuable. The agent will
+  # use the sql_definition as a starting point if it knows your metric.
+
+  - name: active_customer
+    definition: |
+      A customer with at least one shipped order in the trailing 30 days.
+      Excludes orders that were returned or cancelled.
+    sql_definition: |
+      SELECT DISTINCT customer_id
+      FROM finance.invoices
+      WHERE shipped_at > NOW() - INTERVAL '30 days'
+        AND status NOT IN ('returned', 'cancelled')
+    related_terms: [customer, churn, retention]
+    tags: [customer-metric, finance]
+
+  - name: revenue
+    definition: |
+      Sum of net invoice amounts (after discounts, before tax). Always taken
+      from finance.invoices, never from finance.orders — orders represent
+      INTENT to purchase; invoices represent actual revenue events.
+    sql_definition: |
+      SELECT SUM(amount_cents) / 100.0 AS revenue
+      FROM finance.invoices
+      WHERE status = 'paid'
+    related_terms: [invoice, mrr]
+    tags: [finance, metric]
+
+  - name: mrr
+    definition: |
+      Monthly Recurring Revenue. Sum of monthly_amount across all active
+      subscriptions. Excludes one-time fees, setup charges, and overage.
+      Reported on the first of each month.
+    sql_definition: |
+      SELECT SUM(monthly_amount_cents) / 100.0 AS mrr
+      FROM finance.subscriptions
+      WHERE status = 'active'
+    related_terms: [revenue, subscription]
+    tags: [finance, metric, subscription]
+
+  # Concept terms — disambiguate words that have business-specific meaning.
+
+  - name: customer
+    definition: |
+      An organization (B2B) or individual (B2C) that has placed at least one
+      order. We do NOT count people who only signed up for a free trial as
+      customers — see the `lead` term for those.
+    related_terms: [lead, account, active_customer]
+    tags: [customer]
+
+  - name: lead
+    definition: |
+      A person or organization that has expressed interest but has not placed
+      an order. Tracked in marketing.leads. Becomes a customer once their
+      first invoice is paid.
+    related_terms: [customer]
+    tags: [marketing, sales]
+
+  - name: pipeline
+    definition: |
+      Open opportunities in the sales process. Specifically: opportunities
+      where stage IS in ('qualified', 'proposal', 'negotiation') AND
+      close_date > today. Excludes 'closed_won' and 'closed_lost'.
+    sql_definition: |
+      SELECT *
+      FROM sales.opportunities
+      WHERE stage IN ('qualified', 'proposal', 'negotiation')
+        AND close_date > CURRENT_DATE
+    related_terms: [opportunity, lead, customer]
+    tags: [sales, metric]
+
+  # Sensitivity / compliance terms — make the agent aware of legal context.
+
+  - name: pii
+    definition: |
+      Personally Identifiable Information. Includes name, email, phone,
+      address, SSN, government IDs, and date of birth. Columns containing
+      PII are tagged sensitivity:high or sensitivity:secret in their
+      semantic metadata. The agent should NOT include PII in screenshots,
+      summaries shared externally, or query results visible to roles
+      without legitimate need.
+    related_terms: [gdpr, ferpa]
+    tags: [compliance, security]
