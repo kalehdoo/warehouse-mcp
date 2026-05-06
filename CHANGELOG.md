@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-05-06
+
+UX fix: `tools/list` now returns a **role-filtered tool catalog** instead of the full set with denials at call time. Caught while testing v0.4.1 with four parallel Claude Desktop connections (one per role) — all four sessions advertised 13 tools, even though `metadata_only` could only invoke 6 of them. The agent saw the wider catalog, tried disallowed tools, hit denial errors. Wasted round trips, noisy audit log, brittle agent behavior.
+
+### Fixed
+- **`registerAllTools` now skips registration for tools the session's role can't invoke.** Each session creates a fresh McpServer bound to its role's context, and only the role-allowed tools get `server.registerTool()` calls. The MCP SDK's `tools/list` response naturally filters as a result. `assertToolAllowed` inside the handler is kept as defense-in-depth.
+
+### What roles now see (verified end-to-end against a running server)
+| Role | Tools in `tools/list` |
+|---|---|
+| `admin` | All 13 |
+| `reader` | 13 (same set; future write tools will be admin-only) |
+| `reader_restricted` | 11 — drops `query` and `search_value` |
+| `metadata_only` | 6 — `list_schemas`, `list_tables`, `describe_table`, `find_columns`, `get_foreign_keys`, `get_view_definition` |
+
+### Test plan
+- 147/147 unit tests pass (was 141, +6 new in `test/tools/registerAll.test.js` covering each role's expected tool set + tier-strictly-contains-tier-below + unknown-role-fails-closed).
+- End-to-end smoke against a running server with two API keys (`admin` and `metadata_only`): admin's `tools/list` returns 13 tools; metadata_only's returns 6.
+- Lint clean.
+- `mcp-publisher validate` clean for v0.4.2.
+
+### Notes
+- Backwards compatible. Customers who use a single role today see no behavior change at the protocol level — the role they had already saw all-allowed tools, and `tools/list` returned the same set.
+- `assertToolAllowed` inside the dispatcher is now redundant for normal flow (the disallowed tools aren't even registered), but kept as defense-in-depth against future code paths that might bypass the registration filter.
+
 ## [0.4.1] — 2026-05-06
 
 Adds **schema-level documentation** as a first-class file shape — `schemas.yml` at the root of `SEMANTIC_DIR` describes what each warehouse schema is *for*, who owns it, refresh cadence, and sensitivity. The agent's `warehouse://semantic/schemas/list` and `warehouse://semantic/schemas/{schema}` resources now include this richer overview instead of just enumerating tables. Closes the "schema-level docs gap" called out as deferred in v0.4.0.
@@ -187,7 +212,8 @@ First end-to-end working version. Customers can install via Docker, npx, or dire
 - **No native query timeout for DuckDB.** Documented; affects only the local-demo path.
 - **21 transitive npm vulnerabilities** from `snowflake-sdk`'s old AWS SDK chain. Tracked separately, not auto-fixed because forcing the update risks breaking known-good driver behavior.
 
-[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.3...v0.3.4
