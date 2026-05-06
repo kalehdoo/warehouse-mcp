@@ -117,6 +117,10 @@ cp .env.example .env
 
 Off by default. Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318/v1/traces` in your env and the server will emit per-tool-call spans (resource attributes: `service.name=warehouse-mcp`, `service.version=0.1.0`; span attributes: `warehouse.tenant`, `warehouse.role`).
 
+## How it works
+
+Read [docs/architecture.md](docs/architecture.md) for the request flow — what files execute when an MCP client makes a call, how the guardrail pipeline composes around the tool handler, and the recipes for adding a new tool / guardrail / adapter. Single-page orientation for operators, security reviewers, and contributors.
+
 ## Security
 
 Read [docs/threat-model.md](docs/threat-model.md) before deploying. It covers the OWASP Top 10 mapping, what the codebase mitigates, and what is left to your deployment (TLS, secrets management, network isolation, cost guardrails). Report vulnerabilities per [SECURITY.md](SECURITY.md).
