@@ -1,14 +1,21 @@
 import { TOOL_DEFINITIONS } from "./index.js";
-import { assertToolAllowed } from "../security/policy.js";
+import { assertToolAllowed, isToolAllowed } from "../security/policy.js";
 import { withSpan } from "../observability/otel.js";
 import { applyResultCap } from "../util/resultCap.js";
 
 /**
- * Register all tools on the given McpServer instance.
- * The Context is captured by closure — each session has its own server + ctx.
+ * Register the tools allowed for this session's role on the given McpServer
+ * instance. The Context is captured by closure — each session has its own
+ * server + ctx, so each session sees a tools/list response shaped by its role.
+ *
+ * Tools the role isn't permitted to invoke aren't registered at all. This
+ * means the agent's tool catalog ALREADY excludes disallowed tools — no more
+ * "agent tries `query` as a metadata_only role and gets denied at call
+ * time." `assertToolAllowed` inside the handler is kept as defense-in-depth
+ * (e.g. against future code paths that bypass registration).
  *
  * Order of operations per tool call:
- *   1. assertToolAllowed (role policy)
+ *   1. assertToolAllowed (role policy — defense in depth)
  *   2. rateLimiter.charge
  *   3. guardrails pre-pipeline (deny / approve_required short-circuit)
  *   4. tool handler
@@ -27,6 +34,11 @@ import { applyResultCap } from "../util/resultCap.js";
  */
 export function registerAllTools(server, ctx, deps = {}) {
   for (const def of TOOL_DEFINITIONS) {
+    if (!isToolAllowed(ctx.role, def.name)) {
+      // Skip — the role can't invoke this tool, so don't even advertise it
+      // in tools/list. Cleaner agent UX and a smaller audit footprint.
+      continue;
+    }
     server.registerTool(
       def.name,
       {
