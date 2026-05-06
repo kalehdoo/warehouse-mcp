@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`server.json` is now npm-only.** The OCI package entry was removed before the first successful registry publish because the registry requires OCI images to carry a `LABEL io.modelcontextprotocol.server.name` annotation, which our Dockerfile doesn't yet emit. The npm + stdio path is what AI clients (Claude Desktop, Cursor) actually use for discovery, so the registry entry is functionally complete without OCI. The OCI entry will return in v0.3.5 alongside the Dockerfile label addition. Live registry entry: `io.github.kalehdoo/warehouse-mcp@0.3.4`.
+
 ## [0.3.4] — 2026-05-06
 
 Re-publish of v0.3.3 with the schema-corrected `server.json`. The 0.3.3 npm publish shipped a `server.json` with two schema violations (description over 100 chars, and `transport.type: "http"` instead of the valid `"streamable-http"`) that were caught by `mcp-publisher validate` after the fact. The fix landed on main but didn't get tagged before npm 0.3.3 was published. Since npm versions are immutable, this bumps to 0.3.4 so the registry-publishable `server.json` is in a tagged release.

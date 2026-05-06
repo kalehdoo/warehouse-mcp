@@ -149,37 +149,6 @@
           "default": "0"
         }
       ]
-    },
-    {
-      "registryType": "oci",
-      "identifier": "ghcr.io/kalehdoo/warehouse-mcp",
-      "version": "0.3.4",
-      "transport": {
-        "type": "streamable-http",
-        "url": "http://localhost:3001/mcp"
-      },
-      "environmentVariables": [
-        {
-          "name": "WAREHOUSE_TYPE",
-          "description": "Which warehouse to connect to. Same options as the npm package above.",
-          "isRequired": true,
-          "isSecret": false,
-          "choices": ["postgres", "oracle", "redshift", "snowflake", "bigquery", "duckdb"]
-        },
-        {
-          "name": "MCP_API_KEYS",
-          "description": "Bearer keys for HTTP transport. Required for any non-localhost deployment.",
-          "isRequired": true,
-          "isSecret": true
-        },
-        {
-          "name": "MCP_SERVER_PORT",
-          "description": "HTTP port the MCP server binds inside the container.",
-          "isRequired": false,
-          "isSecret": false,
-          "default": "3001"
-        }
-      ]
     }
   ]
 }
