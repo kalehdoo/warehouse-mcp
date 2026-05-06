@@ -16,3 +16,4 @@ coverage/
 .vscode/
 .idea/
 .nyc_output/
+/semantic/
