@@ -135,6 +135,12 @@ cp .env.example .env
 
 For testcontainers integration tests against real Postgres: `npm run test:integration` (Docker required).
 
+## Optional: Semantic metadata (v0.4+)
+
+Teach the AI agent **what your warehouse means**, not just what's in it. Drop YAML files describing your business glossary and table semantics into a directory, point `SEMANTIC_DIR` at it, and the agent fetches them as MCP resources before issuing queries — instead of guessing what "revenue" or "active customer" mean from column names.
+
+Format follows dbt's `schema.yml` v2 with one extension (`meta.schema:` per model). Customers using dbt can point `SEMANTIC_DIR` at their existing `models/` directory and reuse most of what they have. See [docs/semantic-metadata.md](https://github.com/kalehdoo/warehouse-mcp/blob/main/docs/semantic-metadata.md) and the starter [docs/semantic-templates/](https://github.com/kalehdoo/warehouse-mcp/tree/main/docs/semantic-templates).
+
 ## Optional: OpenTelemetry tracing
 
 Off by default. Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318/v1/traces` in your env and the server will emit per-tool-call spans. Resource attributes: `service.name=warehouse-mcp`, `service.version=<package.json version>`. Span attributes: `warehouse.tenant`, `warehouse.role`. Works with any OTLP/HTTP backend (Grafana Tempo, Honeycomb, Datadog APM, New Relic, SigNoz).

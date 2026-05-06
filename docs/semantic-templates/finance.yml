@@ -1,0 +1,235 @@
+# Semantic documentation for the `finance` schema.
+#
+# Format: dbt schema.yml v2 — same conventions dbt uses, with one
+# warehouse-mcp extension: every model declares its target warehouse
+# schema in `meta.schema`.
+#
+# Loaded by warehouse-mcp at startup and exposed at:
+#   warehouse://semantic/schemas/finance              — schema overview
+#   warehouse://semantic/tables/finance/<table_name>  — full table doc
+#
+# You can split this file by table (one .yml per table) or per dbt
+# convention (one .yml per model directory). The loader walks the whole
+# SEMANTIC_DIR; just make sure no two files define the same (schema, table).
+
+version: 2
+
+models:
+  # ── Source-of-truth fact tables ─────────────────────────────────────────
+
+  - name: invoices
+    description: |
+      One row per issued invoice. Created when an order ships; never updated
+      after creation (immutable record). The SOURCE OF TRUTH for revenue
+      reporting — do NOT derive revenue from `finance.orders`, which
+      represents intent to purchase, not actual revenue.
+
+      Hourly refresh from the billing system. Late-arriving invoices (rare,
+      typically <0.1%) are inserted with the original issue date but a
+      later created_at.
+    meta:
+      schema: finance
+      owner: finance-platform-team
+      refresh: hourly
+      sensitivity: medium
+      purpose: mart
+      glossary_terms: [revenue, invoice]
+    columns:
+      - name: id
+        description: Primary key. Monotonically increasing per region.
+        meta:
+          sensitivity: low
+
+      - name: invoice_number
+        description: |
+          Human-readable invoice number printed on customer-facing
+          invoices. Format: INV-YYYY-NNNNNN. Unique. Use this for joins
+          when the source data is from accounting, not internal `id`.
+        meta:
+          sensitivity: low
+
+      - name: customer_id
+        description: |
+          FK to finance.customers.id. Always populated (NOT NULL).
+          For deleted customers (rare, GDPR-driven), the customer row is
+          replaced with a tombstone but the id is preserved here.
+        meta:
+          sensitivity: low
+          glossary_terms: [customer]
+
+      - name: amount_cents
+        description: |
+          Net invoice amount in cents (USD only — multi-currency goes in
+          the separate finance.invoices_multi_currency view). After
+          discounts, before tax. Tax is in `tax_cents`. Total billed to
+          customer = amount_cents + tax_cents.
+        meta:
+          sensitivity: medium
+          unit: USD_cents
+          glossary_terms: [revenue]
+
+      - name: tax_cents
+        description: Tax amount in cents. Always positive or zero.
+        meta:
+          sensitivity: medium
+          unit: USD_cents
+
+      - name: status
+        description: |
+          Lifecycle status. Values:
+            'draft'      — created but not yet sent (rare, < 1 hour)
+            'issued'     — sent to customer, awaiting payment
+            'paid'       — payment received and reconciled
+            'overdue'    — > 30 days past due
+            'cancelled'  — voided after issue (rare, manual review)
+            'returned'   — order returned, invoice reversed
+        meta:
+          sensitivity: low
+          allowed_values: [draft, issued, paid, overdue, cancelled, returned]
+
+      - name: issued_at
+        description: |
+          Timestamp when the invoice was created in the billing system.
+          UTC. Use this for "invoices issued in period X" queries.
+        meta:
+          sensitivity: low
+
+      - name: shipped_at
+        description: |
+          Timestamp when the underlying order shipped. Used by the
+          `active_customer` definition. May be null for digital-only orders
+          where there is no shipment.
+        meta:
+          sensitivity: low
+          glossary_terms: [active_customer]
+
+      - name: paid_at
+        description: |
+          Timestamp when payment cleared. Null until status='paid'.
+          Use this (not issued_at) for "revenue recognized in period X".
+        meta:
+          sensitivity: low
+
+  # ── Dimension table ─────────────────────────────────────────────────────
+
+  - name: customers
+    description: |
+      One row per customer. Slowly-changing — customer profile updates
+      replace the row in place (Type 1 SCD). For change history see
+      `finance.customers_history`.
+
+      Daily refresh from CRM. Customer deletions (GDPR) replace the row
+      with a tombstone (name='[REDACTED]', email='[REDACTED]') but
+      preserve `id` for FK integrity.
+    meta:
+      schema: finance
+      owner: finance-platform-team
+      refresh: daily
+      sensitivity: high
+      purpose: mart
+      glossary_terms: [customer]
+    columns:
+      - name: id
+        description: Primary key. Stable across renames and reorganizations.
+        meta:
+          sensitivity: low
+
+      - name: name
+        description: Display name (organization for B2B, person name for B2C).
+        meta:
+          sensitivity: high
+
+      - name: email
+        description: Primary contact email. Unique. PII.
+        meta:
+          sensitivity: high
+          glossary_terms: [pii]
+
+      - name: country
+        description: ISO 3166-1 alpha-2 country code. Used for tax and shipping.
+        meta:
+          sensitivity: low
+
+      - name: signup_date
+        description: |
+          Date the customer first registered (not their first purchase).
+          For "first purchase date" use a join against the earliest invoice.
+        meta:
+          sensitivity: low
+
+      - name: tier
+        description: |
+          Service tier. Values:
+            'free'         — trial / freemium
+            'standard'     — paid base plan
+            'enterprise'   — custom contract
+        meta:
+          sensitivity: low
+          allowed_values: [free, standard, enterprise]
+
+  # ── Subscription table for MRR queries ──────────────────────────────────
+
+  - name: subscriptions
+    description: |
+      Active and historical subscription records. One row per (customer,
+      plan, period). The MRR glossary term sums monthly_amount_cents
+      across rows where status='active'.
+
+      Hourly refresh. Cancelled subscriptions are NOT deleted — their
+      status is updated to 'cancelled' and ended_at is set.
+    meta:
+      schema: finance
+      owner: finance-platform-team
+      refresh: hourly
+      sensitivity: medium
+      purpose: mart
+      glossary_terms: [mrr, subscription]
+    columns:
+      - name: id
+        description: Primary key.
+        meta:
+          sensitivity: low
+
+      - name: customer_id
+        description: FK to finance.customers.id.
+        meta:
+          sensitivity: low
+          glossary_terms: [customer]
+
+      - name: plan
+        description: |
+          Plan code identifying the subscription product. Joins to
+          `finance.plans` for plan-level metadata (features, list price).
+        meta:
+          sensitivity: low
+
+      - name: monthly_amount_cents
+        description: |
+          Monthly billed amount in cents (negotiated price, not list price).
+          Excludes one-time fees, overage, and add-ons. THIS is the column
+          MRR sums.
+        meta:
+          sensitivity: medium
+          unit: USD_cents
+          glossary_terms: [mrr]
+
+      - name: status
+        description: |
+          Subscription lifecycle. Values:
+            'pending'     — created but not yet started (rare, < 1 hour)
+            'active'      — currently billing
+            'paused'      — customer-requested pause, not billing
+            'cancelled'   — terminated, ended_at set
+        meta:
+          sensitivity: low
+          allowed_values: [pending, active, paused, cancelled]
+
+      - name: started_at
+        description: First billing date. Always populated.
+        meta:
+          sensitivity: low
+
+      - name: ended_at
+        description: Date subscription ended. NULL while status IN ('pending','active','paused').
+        meta:
+          sensitivity: low

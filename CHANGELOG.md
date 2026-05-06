@@ -7,8 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-06
+
+Adds the **semantic-metadata layer** — optional YAML files describing the warehouse's business glossary and table semantics, exposed to AI clients as MCP **resources** (the third MCP primitive, never used before in this project). When a customer fills in the metadata, the agent stops guessing what "revenue" or "active customer" means and starts reading the customer's actual definitions.
+
+### Added
+- **`src/semantic/`** — three modules: `loader.js` (walks `SEMANTIC_DIR`, parses + validates YAML), `schema.js` (zod schemas for the format), `resources.js` (registers MCP resources backed by the index).
+- **YAML format** — adopts dbt's `schema.yml` v2 format with one warehouse-mcp extension (`meta.schema:` per model). Glossary lives in a separate `glossary.yml` file. Customers using dbt can point `SEMANTIC_DIR` at their existing `models/` directory and reuse most of what they have.
+- **Five resource URIs**:
+  - `warehouse://semantic/glossary` — all business-glossary terms
+  - `warehouse://semantic/glossary/{term}` — one term
+  - `warehouse://semantic/schemas/list` — index of documented schemas
+  - `warehouse://semantic/schemas/{schema}` — one schema's purpose + table list
+  - `warehouse://semantic/tables/{schema}/{table}` — full table doc with columns and metadata
+- **`SEMANTIC_DIR` env var** — opt-in. When unset, no resources registered; the layer is fully optional.
+- **`doctor` validation** — `warehouse-mcp doctor` now reports `Semantic dir loaded: N glossary terms, M tables across K schemas` when configured, or `not configured (optional)` when not. Schema errors and collisions surface here.
+- **Templates** at `docs/semantic-templates/` — example `glossary.yml`, `finance.yml`, and a README explaining the format. Customers copy these and edit.
+- **Doc** at `docs/semantic-metadata.md` — full how-to including layout flexibility (per-schema vs per-table vs dbt-mirrored), validation, and drift management guidance.
+- **`js-yaml` dependency** for parsing.
+
 ### Changed
-- **`server.json` is now npm-only.** The OCI package entry was removed before the first successful registry publish because the registry requires OCI images to carry a `LABEL io.modelcontextprotocol.server.name` annotation, which our Dockerfile doesn't yet emit. The npm + stdio path is what AI clients (Claude Desktop, Cursor) actually use for discovery, so the registry entry is functionally complete without OCI. The OCI entry will return in v0.3.5 alongside the Dockerfile label addition. Live registry entry: `io.github.kalehdoo/warehouse-mcp@0.3.4`.
+- `package.json` and `server.json` versions → 0.4.0.
+- `src/index.js` boot now loads semantic dir if configured and threads the index through to the per-session server build.
+
+### Notes
+- This is **purely additive**. No existing tools, adapters, or configs change behavior. Customers who don't set `SEMANTIC_DIR` see the v0.3.x experience unchanged.
+- The semantic layer is loaded once at boot, served from memory, no per-request overhead.
+- Lineage and dbt-manifest auto-import are deferred to a later release.
+
+### Carried over from the prior Unreleased entry
+- **`server.json` is now npm-only.** The OCI package entry was removed before the first successful registry publish because the registry requires OCI images to carry a `LABEL io.modelcontextprotocol.server.name` annotation, which our Dockerfile doesn't yet emit. The npm + stdio path is what AI clients use for discovery, so the registry entry is functionally complete without OCI. Live registry entry as of 0.3.4: `io.github.kalehdoo/warehouse-mcp`.
 
 ## [0.3.4] — 2026-05-06
 
@@ -139,7 +167,8 @@ First end-to-end working version. Customers can install via Docker, npx, or dire
 - **No native query timeout for DuckDB.** Documented; affects only the local-demo path.
 - **21 transitive npm vulnerabilities** from `snowflake-sdk`'s old AWS SDK chain. Tracked separately, not auto-fixed because forcing the update risks breaking known-good driver behavior.
 
-[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.0...v0.3.2
