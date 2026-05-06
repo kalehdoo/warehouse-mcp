@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.kalehdoo/warehouse-mcp",
-  "description": "Production MCP server for your data warehouse. Exposes 13 read-only tools (query, list_schemas, list_tables, describe_table, find_columns, get_foreign_keys, get_view_definition, sample_table, count_rows, column_stats, top_values, time_series, search_value) over a uniform interface to Postgres, Oracle, Snowflake, BigQuery, Redshift, DuckDB, and MotherDuck. Ships dialect-aware SQL validator, four-tier role-based access (metadata_only / reader_restricted / reader / admin), optional warehouse-role impersonation for native RLS / CLS, JSONL audit log, optional output PII masking, signed Docker images and SBOM. Apache 2.0.",
+  "description": "Production MCP server for Postgres, Oracle, Snowflake, BigQuery, Redshift, DuckDB, MotherDuck.",
   "repository": {
     "url": "https://github.com/kalehdoo/warehouse-mcp",
     "source": "github"
@@ -155,7 +155,7 @@
       "identifier": "ghcr.io/kalehdoo/warehouse-mcp",
       "version": "0.3.3",
       "transport": {
-        "type": "http",
+        "type": "streamable-http",
         "url": "http://localhost:3001/mcp"
       },
       "environmentVariables": [
