@@ -6,13 +6,13 @@
     "url": "https://github.com/kalehdoo/warehouse-mcp",
     "source": "github"
   },
-  "version": "0.3.3",
+  "version": "0.3.4",
   "websiteUrl": "https://github.com/kalehdoo/warehouse-mcp",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "warehouse-mcp",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "transport": {
         "type": "stdio"
       },
@@ -153,7 +153,7 @@
     {
       "registryType": "oci",
       "identifier": "ghcr.io/kalehdoo/warehouse-mcp",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "transport": {
         "type": "streamable-http",
         "url": "http://localhost:3001/mcp"

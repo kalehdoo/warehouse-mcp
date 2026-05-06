@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-05-06
+
+Re-publish of v0.3.3 with the schema-corrected `server.json`. The 0.3.3 npm publish shipped a `server.json` with two schema violations (description over 100 chars, and `transport.type: "http"` instead of the valid `"streamable-http"`) that were caught by `mcp-publisher validate` after the fact. The fix landed on main but didn't get tagged before npm 0.3.3 was published. Since npm versions are immutable, this bumps to 0.3.4 so the registry-publishable `server.json` is in a tagged release.
+
+### Changed
+- `package.json` and `server.json` versions → 0.3.4 to match this tag.
+
+### Notes
+- `warehouse-mcp@0.3.3` on npm is functionally fine — `npx warehouse-mcp` users are unaffected. Only the `mcp-publisher publish` path against 0.3.3 would fail. 0.3.4 is the first version with a registry-valid `server.json` baked in.
+- Verified locally with `mcp-publisher validate`: ✅ server.json is valid.
+
 ## [0.3.3] — 2026-05-06
 
 Distribution / discoverability release. No behavior changes. Adds the metadata needed to publish to the official MCP Registry at registry.modelcontextprotocol.io so AI clients can discover warehouse-mcp through their built-in server pickers.
@@ -125,7 +136,8 @@ First end-to-end working version. Customers can install via Docker, npx, or dire
 - **No native query timeout for DuckDB.** Documented; affects only the local-demo path.
 - **21 transitive npm vulnerabilities** from `snowflake-sdk`'s old AWS SDK chain. Tracked separately, not auto-fixed because forcing the update risks breaking known-good driver behavior.
 
-[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.0...v0.3.2
 [0.3.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.2.0...v0.3.0
