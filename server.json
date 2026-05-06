@@ -1,0 +1,185 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.kalehdoo/warehouse-mcp",
+  "description": "Production MCP server for your data warehouse. Exposes 13 read-only tools (query, list_schemas, list_tables, describe_table, find_columns, get_foreign_keys, get_view_definition, sample_table, count_rows, column_stats, top_values, time_series, search_value) over a uniform interface to Postgres, Oracle, Snowflake, BigQuery, Redshift, DuckDB, and MotherDuck. Ships dialect-aware SQL validator, four-tier role-based access (metadata_only / reader_restricted / reader / admin), optional warehouse-role impersonation for native RLS / CLS, JSONL audit log, optional output PII masking, signed Docker images and SBOM. Apache 2.0.",
+  "repository": {
+    "url": "https://github.com/kalehdoo/warehouse-mcp",
+    "source": "github"
+  },
+  "version": "0.3.3",
+  "websiteUrl": "https://github.com/kalehdoo/warehouse-mcp",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "warehouse-mcp",
+      "version": "0.3.3",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "positional",
+          "value": "start",
+          "isRequired": true,
+          "description": "Boots the MCP server. Use 'init' for interactive setup or 'doctor' to diagnose configuration."
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "MCP_TRANSPORT",
+          "description": "Set to 'stdio' for desktop AI clients (Claude Desktop, Cursor). Defaults to 'http'.",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "stdio"
+        },
+        {
+          "name": "WAREHOUSE_TYPE",
+          "description": "Which warehouse to connect to. One of: postgres, oracle, redshift, snowflake, bigquery, duckdb. (DuckDB also handles MotherDuck via DUCKDB_PATH=md:<db>.)",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "string",
+          "choices": ["postgres", "oracle", "redshift", "snowflake", "bigquery", "duckdb"]
+        },
+        {
+          "name": "MCP_API_KEYS",
+          "description": "Comma-separated bearer keys with role and optional warehouse-role impersonation: 'key1:reader,key2:admin', 'key3:reader:set_role=alice'. Leave empty for stdio (OS process boundary is the trust boundary). Required for HTTP.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "DUCKDB_PATH",
+          "description": "DuckDB file path, ':memory:', or 'md:<database>' for MotherDuck. Required when WAREHOUSE_TYPE=duckdb.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "MOTHERDUCK_TOKEN",
+          "description": "MotherDuck service token. Required when DUCKDB_PATH starts with 'md:'.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "PG_HOST",
+          "description": "Postgres host. Required when WAREHOUSE_TYPE=postgres. (Use REDSHIFT_HOST for Redshift.)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "PG_DATABASE",
+          "description": "Postgres database name.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "PG_USER",
+          "description": "Postgres user.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "PG_PASSWORD",
+          "description": "Postgres password.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "ORACLE_USER",
+          "description": "Oracle user. Required when WAREHOUSE_TYPE=oracle.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "ORACLE_PASSWORD",
+          "description": "Oracle password.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "ORACLE_CONNECT_STRING",
+          "description": "Oracle Easy Connect (e.g. host:1521/SERVICE), TNS descriptor, or alias.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "SNOWFLAKE_ACCOUNT",
+          "description": "Snowflake account identifier (e.g. xy12345.us-east-1). Required when WAREHOUSE_TYPE=snowflake.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "SNOWFLAKE_USER",
+          "description": "Snowflake username.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "SNOWFLAKE_PRIVATE_KEY_PATH",
+          "description": "Path to PKCS8 private key (.p8). Snowflake auth is key-pair only; password auth is not supported.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "BIGQUERY_PROJECT",
+          "description": "GCP project id. Required when WAREHOUSE_TYPE=bigquery.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "GOOGLE_APPLICATION_CREDENTIALS",
+          "description": "Path to BigQuery service-account JSON. Omit on GKE / Cloud Run with workload identity.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "GUARDRAIL_PII_MASK",
+          "description": "Set to 'on' to enable role-aware PII masking on result rows (emails, SSNs, phones, IPs, Luhn-validated CCs). Off by default.",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "off",
+          "choices": ["on", "off"]
+        },
+        {
+          "name": "MCP_RATE_LIMIT_RPM",
+          "description": "Per-principal token-bucket rate limit on tool invocations. 0 = disabled. Recommend 60 for production.",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "0"
+        }
+      ]
+    },
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/kalehdoo/warehouse-mcp",
+      "version": "0.3.3",
+      "transport": {
+        "type": "http",
+        "url": "http://localhost:3001/mcp"
+      },
+      "environmentVariables": [
+        {
+          "name": "WAREHOUSE_TYPE",
+          "description": "Which warehouse to connect to. Same options as the npm package above.",
+          "isRequired": true,
+          "isSecret": false,
+          "choices": ["postgres", "oracle", "redshift", "snowflake", "bigquery", "duckdb"]
+        },
+        {
+          "name": "MCP_API_KEYS",
+          "description": "Bearer keys for HTTP transport. Required for any non-localhost deployment.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "MCP_SERVER_PORT",
+          "description": "HTTP port the MCP server binds inside the container.",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "3001"
+        }
+      ]
+    }
+  ]
+}

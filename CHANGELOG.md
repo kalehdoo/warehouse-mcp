@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-05-06
+
+Distribution / discoverability release. No behavior changes. Adds the metadata needed to publish to the official MCP Registry at registry.modelcontextprotocol.io so AI clients can discover warehouse-mcp through their built-in server pickers.
+
+### Added
+- **`mcpName: "io.github.kalehdoo/warehouse-mcp"`** in package.json — required by the MCP Registry to bind the npm package to its server entry. The `io.github.<owner>/` namespace ties registry ownership to GitHub auth.
+- **`server.json`** — registry manifest declaring two install paths (npm + stdio for desktop AI clients, OCI/Docker + HTTP for deployed servers), plus environment-variable documentation for every supported warehouse with `isRequired` / `isSecret` flags. ~200 lines.
+
+### Changed
+- `package.json` version → 0.3.3 to match this tag.
+
+### Notes
+- After this version is published to npm, the maintainer runs `mcp-publisher login` then `mcp-publisher publish` against `server.json` to push the registry entry. The registry validates that `server.json`'s `name` matches the npm package's `mcpName` field, which proves package ownership.
+- Schema URL pinned to `2025-12-11` — the version frozen for the v0.1 API freeze that started 2025-10-24. May need a bump when the registry exits preview to GA.
+
 ## [0.3.2] — 2026-05-06
 
 Tooling release. No behavior changes; ships a guardrail in the release workflow plus the npm-publish prep that should have landed in v0.3.1.
@@ -110,7 +125,8 @@ First end-to-end working version. Customers can install via Docker, npx, or dire
 - **No native query timeout for DuckDB.** Documented; affects only the local-demo path.
 - **21 transitive npm vulnerabilities** from `snowflake-sdk`'s old AWS SDK chain. Tracked separately, not auto-fixed because forcing the update risks breaking known-good driver behavior.
 
-[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.3.0...v0.3.2
 [0.3.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kalehdoo/warehouse-mcp/compare/v0.1.1...v0.2.0
