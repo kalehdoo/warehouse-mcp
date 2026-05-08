@@ -7,6 +7,9 @@ Production MCP (Model Context Protocol) server for your data warehouse. Read-onl
 
 > **Status:** v0.3.1 — production-ready for the v1 warehouse list. See [CHANGELOG](https://github.com/kalehdoo/warehouse-mcp/blob/main/CHANGELOG.md) for what shipped in each release.
 
+## Demo Videos
+[Warehouse MCP in action using Cursor](https://youtu.be/DGgI7cczEtk)
+
 ## Supported warehouses
 
 | Warehouse | Adapter docs |
