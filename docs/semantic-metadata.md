@@ -191,6 +191,97 @@ SEMANTIC_DIR=/repo/dbt_project/models
 # Just add `meta.schema:` to each model.
 ```
 
+## Linking an external or dbt directory
+
+`SEMANTIC_DIR` accepts **any absolute path** reachable by the server process — it does not need to be inside the warehouse-mcp project. The loader walks recursively, picks up `*.yml` / `*.yaml`, and silently ignores everything else (including `.sql`, `.csv`, READMEs), so a dbt project's `models/` directory works as-is.
+
+### Local (npx / `node src/index.js`)
+
+```bash
+# Anywhere on the filesystem
+SEMANTIC_DIR=/Users/you/work/company-semantic
+
+# Or a dbt project — keep your existing schema.yml files where they are
+SEMANTIC_DIR=/Users/you/dbt-projects/analytics/models
+```
+
+> Node does not expand `~`. Use `$HOME/semantic` or the full path. Relative paths resolve against the server process's `cwd`, which is rarely what you want — prefer absolute.
+
+### Docker — volume mount + `SEMANTIC_DIR` pointing at the mount
+
+The path must be valid *inside the container*:
+
+```bash
+docker run -d -p 3001:3001 \
+  -e WAREHOUSE_TYPE=postgres -e PG_HOST=db ... \
+  -v /Users/you/dbt-projects/analytics/models:/app/semantic:ro \
+  -e SEMANTIC_DIR=/app/semantic \
+  ghcr.io/kalehdoo/warehouse-mcp:latest
+```
+
+The `:ro` (read-only) mount is the right default — warehouse-mcp never writes to `SEMANTIC_DIR`, and read-only mounts cleanly express "this is config the server consumes."
+
+For `docker compose`:
+
+```yaml
+services:
+  warehouse-mcp:
+    volumes:
+      - /Users/you/dbt-projects/analytics/models:/app/semantic:ro
+    environment:
+      SEMANTIC_DIR: /app/semantic
+```
+
+For Kubernetes, mount a `ConfigMap` or a PVC at `/app/semantic` and set `SEMANTIC_DIR=/app/semantic` in the pod env.
+
+### Symlink — when the external dir is its own git repo
+
+If you maintain semantic docs in a separate repo or shared workspace and want a stable path inside the warehouse-mcp project, a symlink works. The loader uses `statSync` (which follows symlinks), not `lstatSync`:
+
+```bash
+ln -s /Users/you/work/company-semantic ./semantic-external
+SEMANTIC_DIR=./semantic-external    # or the absolute path; either works
+```
+
+### dbt project layout — skip the separate directory entirely
+
+If you already keep dbt schema docs, point at `models/` directly and add `meta.schema:` to each model entry. That's the only warehouse-mcp extension to dbt's vanilla `schema.yml v2` format:
+
+```yaml
+# models/staging/finance/_schema.yml
+version: 2
+models:
+  - name: stg_finance__orders
+    description: One row per paid order.
+    meta:
+      schema: staging_finance    # ← required; warehouse-mcp uses this to key the index
+      purpose: staging
+      refresh: hourly
+    columns:
+      - name: order_id
+        description: Primary key
+```
+
+dbt's own parser ignores the `meta.schema:` field, so the same file works for both tools.
+
+### Verify the path resolved
+
+```bash
+warehouse-mcp doctor
+# ✓ Semantic dir loaded  N glossary terms, M tables across K schemas (SEMANTIC_DEFAULT=on)
+```
+
+If `doctor` reports the dir as missing or shows zero counts, common causes:
+
+- Tilde (`~`) not expanded — use `$HOME/...` or full path.
+- Relative path resolved against an unexpected `cwd` — prefer absolute.
+- Docker container can't see the host path — confirm the volume mount.
+- Files named `schemas.yaml` (plural) at depth > root — those are reserved for schema-level docs at the root only. Subdir model files should be named anything else (e.g. `_schema.yml`, `finance.yml`).
+
+### Cost reminder
+
+The entire directory is read **once at boot**. File-system latency (NFS, network mounts, slow disks) only affects startup time, not per-request performance. After the boot scan, every semantic resource or `*_lookup` tool call is a pure in-memory `Map.get`.
+
 ## What this is NOT
 
 - **Not lineage.** Lineage (table A is built from table B) lands in a future release — likely v0.5 with dbt-manifest auto-import. Today's semantic layer is description + glossary.
