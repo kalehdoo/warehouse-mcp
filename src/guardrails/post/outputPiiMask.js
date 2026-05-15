@@ -113,6 +113,7 @@ const ROLE_LEVEL = {
   reader: "partial",
   reader_restricted: "full",
   metadata_only: null, // never returns row data anyway
+  semantic_only: null, // zero tools registered — guardrail never fires for this role
 };
 
 export const outputPiiMask = {

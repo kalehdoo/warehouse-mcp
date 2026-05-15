@@ -6,13 +6,16 @@
  * @typedef {object} Context
  * @property {string} tenantId         Tenant identifier. Defaults to env TENANT_ID for self-hosted.
  * @property {string} role             MCP role from API key or JWT claim
- *                                     (`metadata_only` | `reader_restricted` | `reader` | `admin`).
+ *                                     (`semantic_only` | `metadata_only` | `reader_restricted` | `reader` | `admin`).
  * @property {string} principal        Stable identity for audit logs
  *                                     (token suffix, JWT sub, or `dev-anonymous`).
  * @property {string} [warehouseRole]  Optional warehouse-side role to impersonate via
  *                                     `SET ROLE` (Postgres/Redshift). Lets warehouse-native
  *                                     RLS / CLS / masking policies enforce per-MCP-key access
  *                                     without duplicating them in MCP.
+ * @property {boolean} includeSemantic Whether this session sees the warehouse://semantic/*
+ *                                     resources. Resolved from API-key option, JWT claim,
+ *                                     or SEMANTIC_DEFAULT — in that precedence order.
  * @property {string} [requestId]      Optional correlation id for tracing.
  */
 
@@ -21,12 +24,13 @@
  * @param {Partial<Context>} fields
  * @returns {Context}
  */
-export function makeContext({ tenantId, role, principal, warehouseRole, requestId } = {}) {
+export function makeContext({ tenantId, role, principal, warehouseRole, includeSemantic, requestId } = {}) {
   return {
     tenantId: tenantId || "default",
     role: role || "admin",
     principal: principal || "dev-anonymous",
     warehouseRole: warehouseRole || undefined,
+    includeSemantic: includeSemantic === undefined ? true : Boolean(includeSemantic),
     requestId:
       requestId ||
       `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,

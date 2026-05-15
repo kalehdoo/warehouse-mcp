@@ -1,7 +1,12 @@
 /**
  * Role-based tool authorization.
  *
- * Four read tiers + admin, in order of increasing access:
+ * Five tiers in order of increasing access:
+ *
+ *   semantic_only    — zero tools registered. Pair with `semantic=on` so the
+ *                      session sees the warehouse://semantic/* resources but
+ *                      cannot invoke anything against the live warehouse.
+ *                      Docs-viewer persona for non-technical stakeholders.
  *
  *   metadata_only    — schema/catalog discovery only. Never reads row data.
  *                      For agents that need to "map" the warehouse without
@@ -18,11 +23,23 @@
  *   admin            — every tool, including future write tools (gated by
  *                      ENABLE_WRITE_TOOLS).
  *
- * Custom roles can be added later via a security policy file; for v0.3 these
- * four cover the common ground.
+ * Custom roles can be added later via a security policy file; for v0.4 these
+ * five cover the common ground.
  */
 
+// Semantic-lookup tools — in-memory Map reads, no warehouse I/O. Available to
+// every tier since they're effectively free; the `semantic_only` role gets
+// these AND NOTHING ELSE.
+const SEMANTIC_LOOKUP_TOOLS = new Set([
+  "glossary_lookup",
+  "schema_lookup",
+  "table_lookup",
+]);
+
+const SEMANTIC_ONLY_TOOLS = new Set([...SEMANTIC_LOOKUP_TOOLS]);
+
 const METADATA_TOOLS = new Set([
+  ...SEMANTIC_LOOKUP_TOOLS,
   "list_schemas",
   "list_tables",
   "describe_table",
@@ -52,6 +69,7 @@ const ADMIN_TOOLS = new Set([
 ]);
 
 const ROLE_TOOLS = {
+  semantic_only: SEMANTIC_ONLY_TOOLS,
   metadata_only: METADATA_TOOLS,
   reader_restricted: RESTRICTED_READ_TOOLS,
   reader: READER_TOOLS,

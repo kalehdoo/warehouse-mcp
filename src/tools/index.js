@@ -15,13 +15,21 @@ import {
   timeSeriesTool,
 } from "./profile.js";
 import { searchValueTool } from "./search.js";
+import { glossaryLookupTool, schemaLookupTool, tableLookupTool } from "./semantic.js";
 
 /**
- * The 13 read-only tools the server exposes. Order matters only for documentation
- * purposes — the MCP `tools/list` response preserves insertion order, and we
- * group by intent: query, catalog discovery, single-table profile, search.
+ * Read-only tools the server exposes, grouped by intent. Insertion order is
+ * preserved by MCP's `tools/list` response.
+ *
+ * Semantic-lookup tools are placed first so role-filtered registration makes
+ * them the only tools `semantic_only` sees, and so they're top of the list for
+ * tool-centric clients (Claude Desktop) where ordering nudges agent priors.
  */
 export const TOOL_DEFINITIONS = [
+  // Semantic lookups — in-memory Map reads, no warehouse I/O
+  glossaryLookupTool,
+  schemaLookupTool,
+  tableLookupTool,
   // Free-form
   queryTool,
   // Catalog discovery

@@ -60,6 +60,10 @@ export class JsonlAuditSink {
       principal: entry.ctx.principal,
       role: entry.ctx.role,
       warehouse_role: entry.ctx.warehouseRole,
+      // Whether this session was granted the warehouse://semantic/* resources.
+      // Helps explain after-the-fact why one principal's queries are more or
+      // less precise than another's running on the same tools.
+      include_semantic: entry.ctx.includeSemantic,
       request_id: entry.ctx.requestId,
       tool: entry.tool,
       sql: clipString(entry.sql, max),

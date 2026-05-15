@@ -47,4 +47,35 @@ describe("MCP_API_KEYS parser", () => {
     const cfg = loadConfig();
     expect(cfg.auth.apiKeys.size).toBe(0);
   });
+
+  it("parses semantic=on|off per-key option", () => {
+    process.env.MCP_API_KEYS = "a:reader:semantic=on,b:reader:semantic=off,c:reader";
+    const cfg = loadConfig();
+    expect(cfg.auth.apiKeys.get("a")).toEqual({ role: "reader", includeSemantic: true });
+    expect(cfg.auth.apiKeys.get("b")).toEqual({ role: "reader", includeSemantic: false });
+    // No override → field absent so bearer.js falls back to SEMANTIC_DEFAULT.
+    expect(cfg.auth.apiKeys.get("c")).toEqual({ role: "reader" });
+  });
+
+  it("combines set_role and semantic options on the same key", () => {
+    process.env.MCP_API_KEYS = "k:reader:set_role=alice:semantic=off";
+    const cfg = loadConfig();
+    expect(cfg.auth.apiKeys.get("k")).toEqual({
+      role: "reader",
+      warehouseRole: "alice",
+      includeSemantic: false,
+    });
+  });
+});
+
+describe("SEMANTIC_DEFAULT parsing", () => {
+  it("defaults to on when unset", () => {
+    delete process.env.SEMANTIC_DEFAULT;
+    expect(loadConfig().semantic.defaultIncluded).toBe(true);
+  });
+
+  it("becomes false when SEMANTIC_DEFAULT=off", () => {
+    process.env.SEMANTIC_DEFAULT = "off";
+    expect(loadConfig().semantic.defaultIncluded).toBe(false);
+  });
 });

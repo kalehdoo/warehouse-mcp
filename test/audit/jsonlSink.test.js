@@ -37,6 +37,16 @@ describe("JsonlAuditSink", () => {
     expect(record.duration_ms).toBe(5);
   });
 
+  it("records the session's include_semantic flag", () => {
+    const sink = new JsonlAuditSink({ dir, rotation: "off" });
+    sink.write({ ctx: { ...ctx, includeSemantic: false }, tool: "query", durationMs: 1 });
+    sink.write({ ctx: { ...ctx, includeSemantic: true }, tool: "query", durationMs: 1 });
+    sink.close();
+    const lines = readFileSync(join(dir, "audit.jsonl"), "utf8").trim().split("\n");
+    expect(JSON.parse(lines[0]).include_semantic).toBe(false);
+    expect(JSON.parse(lines[1]).include_semantic).toBe(true);
+  });
+
   it("clips oversized sql and error fields", () => {
     const sink = new JsonlAuditSink({ dir, rotation: "off", fieldMaxBytes: 100 });
     const big = "x".repeat(10_000);

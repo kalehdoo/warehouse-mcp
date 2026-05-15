@@ -52,6 +52,8 @@ The MCP `reader_restricted` tier is the load-bearing piece for sensitive domains
 
 For domains that should **never expose row data** (the most sensitive — `payroll_restricted`, `hr_restricted`), use the `metadata_only` tier. The agent can list schemas and tables, see column names, but never read a value.
 
+For personas that should **see only the human-authored documentation** — non-technical stakeholders browsing the glossary, onboarding learners, downstream tools that scrape semantic docs — use the `semantic_only` tier. Zero tools are registered for the session, so the agent literally cannot touch the warehouse; it can only read `warehouse://semantic/*` resources (when paired with `semantic=on` or `SEMANTIC_DEFAULT=on`). Useful as the safest possible read posture.
+
 ---
 
 ## Example case study

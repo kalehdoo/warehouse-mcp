@@ -109,7 +109,11 @@ async function checkSemantic(config) {
     if (!result.enabled && result.missingDir) {
       return fail("Semantic dir", `${result.missingDir} does not exist`);
     }
-    return ok("Semantic dir loaded", summarize(result.index));
+    const defaultMode = config.semantic.defaultIncluded ? "on" : "off";
+    return ok(
+      "Semantic dir loaded",
+      `${summarize(result.index)} (SEMANTIC_DEFAULT=${defaultMode})`,
+    );
   } catch (e) {
     return fail("Semantic dir", e.message);
   }

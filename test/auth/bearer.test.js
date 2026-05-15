@@ -1,11 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { authenticate } from "../../src/auth/bearer.js";
 
-function makeProvider({ apiKeys = new Map(), oidc = null, tenantId = "default" } = {}) {
+function makeProvider({
+  apiKeys = new Map(),
+  oidc = null,
+  tenantId = "default",
+  semanticDefault = true,
+} = {}) {
   return {
     config: { tenant: { defaultTenantId: tenantId } },
     getApiKeys: () => apiKeys,
     getOidcConfig: () => oidc,
+    getSemanticDefault: () => semanticDefault,
   };
 }
 
@@ -49,5 +55,37 @@ describe("authenticate", () => {
     const provider = makeProvider({ apiKeys: new Map([["k", "admin"]]), tenantId: "acme" });
     const r = await authenticate(req({ authorization: "Bearer k" }), provider);
     expect(r.ctx.tenantId).toBe("acme");
+  });
+
+  it("falls back to server semantic default when the key has no override", async () => {
+    const provider = makeProvider({
+      apiKeys: new Map([["k", { role: "reader" }]]),
+      semanticDefault: false,
+    });
+    const r = await authenticate(req({ authorization: "Bearer k" }), provider);
+    expect(r.ctx.includeSemantic).toBe(false);
+  });
+
+  it("honors per-key semantic=on override even when the server default is off", async () => {
+    const provider = makeProvider({
+      apiKeys: new Map([["k", { role: "reader", includeSemantic: true }]]),
+      semanticDefault: false,
+    });
+    const r = await authenticate(req({ authorization: "Bearer k" }), provider);
+    expect(r.ctx.includeSemantic).toBe(true);
+  });
+
+  it("honors per-key semantic=off override even when the server default is on", async () => {
+    const provider = makeProvider({
+      apiKeys: new Map([["k", { role: "reader", includeSemantic: false }]]),
+      semanticDefault: true,
+    });
+    const r = await authenticate(req({ authorization: "Bearer k" }), provider);
+    expect(r.ctx.includeSemantic).toBe(false);
+  });
+
+  it("anonymous dev mode also picks up the server semantic default", async () => {
+    const r = await authenticate(req(), makeProvider({ semanticDefault: false }));
+    expect(r.ctx.includeSemantic).toBe(false);
   });
 });

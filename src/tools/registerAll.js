@@ -26,11 +26,11 @@ import { applyResultCap } from "../util/resultCap.js";
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
  * @param {import("../auth/context.js").Context} ctx
  * @param {{
- *   provider: object,
+ *   provider?: object,
  *   audit?: import("../audit/jsonlSink.js").JsonlAuditSink,
  *   rateLimiter?: import("../security/rateLimit.js").TokenBucketRateLimiter,
  *   guardrails?: import("../guardrails/pipeline.js").GuardrailPipeline,
- * }} deps
+ * }} [deps]
  */
 export function registerAllTools(server, ctx, deps = {}) {
   for (const def of TOOL_DEFINITIONS) {

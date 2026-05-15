@@ -6,14 +6,53 @@ import {
   VALID_ROLES,
 } from "../../src/security/policy.js";
 
-describe("role policy — four tiers", () => {
-  it("exposes the four role names", () => {
+describe("role policy — five tiers", () => {
+  it("exposes the five role names", () => {
     expect(VALID_ROLES).toEqual([
+      "semantic_only",
       "metadata_only",
       "reader_restricted",
       "reader",
       "admin",
     ]);
+  });
+
+  it("semantic_only allows only the in-memory semantic-lookup tools", () => {
+    expect(listToolsForRole("semantic_only").sort()).toEqual([
+      "glossary_lookup",
+      "schema_lookup",
+      "table_lookup",
+    ]);
+    for (const t of ["glossary_lookup", "schema_lookup", "table_lookup"]) {
+      expect(isToolAllowed("semantic_only", t)).toBe(true);
+    }
+    for (const t of [
+      "list_schemas",
+      "list_tables",
+      "describe_table",
+      "query",
+      "sample_table",
+      "search_value",
+    ]) {
+      expect(isToolAllowed("semantic_only", t)).toBe(false);
+    }
+  });
+
+  it("semantic_only is recognized (not lumped with unknown roles)", () => {
+    // Guards against a regression where a typo or missing entry in ROLE_TOOLS
+    // would silently turn semantic_only into an unknown-role-style deny.
+    expect(VALID_ROLES.includes("semantic_only")).toBe(true);
+    expect(() => assertToolAllowed({ role: "semantic_only" }, "list_schemas")).toThrow(
+      /not permitted/,
+    );
+  });
+
+  it("higher tiers inherit the semantic-lookup tools as cheap free reads", () => {
+    for (const role of ["metadata_only", "reader_restricted", "reader", "admin"]) {
+      expect(isToolAllowed(role, "glossary_lookup")).toBe(true);
+      expect(isToolAllowed(role, "schema_lookup")).toBe(true);
+      expect(isToolAllowed(role, "table_lookup")).toBe(true);
+    }
   });
 
   it("metadata_only allows catalog tools only — no row data", () => {

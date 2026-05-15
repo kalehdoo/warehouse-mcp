@@ -36,6 +36,10 @@ const BaseEnvSchema = z.object({
   // warehouse (business glossary + table/column docs). Optional. When set,
   // warehouse-mcp exposes the contents as MCP resources at warehouse://semantic/*.
   SEMANTIC_DIR: z.string().default(""),
+  // Server-wide default for whether sessions include semantic resources.
+  // Only meaningful when SEMANTIC_DIR is set. Per-API-key (`semantic=on|off`)
+  // and per-JWT (`include_semantic`) overrides take precedence.
+  SEMANTIC_DEFAULT: z.enum(["on", "off"]).default("on"),
 });
 
 /**
@@ -45,6 +49,7 @@ const BaseEnvSchema = z.object({
  *   key1:reader                                — basic
  *   key2:reader:set_role=alice_finance         — with warehouse-role impersonation
  *   key3:reader_restricted:set_role=audit_ro   — multiple options separated by colons
+ *   key4:reader:semantic=off                   — disable semantic resources for this key
  *
  * Each segment after the role is `name=value`. Unknown options are ignored
  * silently (so future options don't break old parsers).
@@ -63,6 +68,13 @@ function parseApiKeys(raw) {
       const name = segment.slice(0, eq).trim();
       const value = segment.slice(eq + 1).trim();
       if (name === "set_role") options.warehouseRole = value;
+      // Tri-state: present-and-on, present-and-off, or absent (fall back to
+      // server default). Absent stays undefined so callers can distinguish
+      // "explicitly on" from "no override".
+      else if (name === "semantic") {
+        if (value === "on") options.includeSemantic = true;
+        else if (value === "off") options.includeSemantic = false;
+      }
     }
     map.set(token, { role, ...options });
   }
@@ -167,6 +179,7 @@ export function loadConfig(env = process.env) {
     },
     semantic: {
       dir: parsed.SEMANTIC_DIR || undefined,
+      defaultIncluded: parsed.SEMANTIC_DEFAULT === "on",
     },
     warehouse: buildWarehouseConfig(parsed),
   };
@@ -201,5 +214,8 @@ export class EnvConfigProvider {
   }
   getSafetyConfig() {
     return this.config.safety;
+  }
+  getSemanticDefault() {
+    return this.config.semantic.defaultIncluded;
   }
 }

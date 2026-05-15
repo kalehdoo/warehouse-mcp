@@ -16,6 +16,7 @@ export async function startStdioTransport({ config, provider, audit, rateLimiter
     tenantId: config.tenant.defaultTenantId,
     role: "admin",
     principal: "stdio-local",
+    includeSemantic: config.semantic.defaultIncluded,
   });
   const server = buildServer(ctx, { provider, audit, rateLimiter, guardrails, semantic });
   const transport = new StdioServerTransport();

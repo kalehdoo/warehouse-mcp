@@ -3,9 +3,9 @@
 [![CI](https://github.com/kalehdoo/warehouse-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/kalehdoo/warehouse-mcp/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/kalehdoo/warehouse-mcp/blob/main/LICENSE)
 
-Production MCP (Model Context Protocol) server for your data warehouse. Read-only enforcement, four-tier role-based access, optional warehouse-role impersonation (for native RLS / CLS), JSONL audit log, optional output PII masking. Self-host the Docker image, install via npx, or wait for the upcoming managed cloud variant.
+Production MCP (Model Context Protocol) server for your data warehouse. Read-only enforcement, five-tier role-based access, optional warehouse-role impersonation (for native RLS / CLS), JSONL audit log, optional output PII masking, optional semantic-metadata layer (glossary + table docs) with per-session toggle. Self-host the Docker image, install via npx, or wait for the upcoming managed cloud variant.
 
-> **Status:** v0.3.1 — production-ready for the v1 warehouse list. See [CHANGELOG](https://github.com/kalehdoo/warehouse-mcp/blob/main/CHANGELOG.md) for what shipped in each release.
+> **Status:** v0.4.x — production-ready for the v1 warehouse list. See [CHANGELOG](https://github.com/kalehdoo/warehouse-mcp/blob/main/CHANGELOG.md) for what shipped in each release.
 
 ## Demo Videos
 [Warehouse MCP in action using Cursor](https://youtu.be/DGgI7cczEtk)
@@ -24,7 +24,7 @@ Production MCP (Model Context Protocol) server for your data warehouse. Read-onl
 
 Databricks SQL is a fast-follow.
 
-## Tools exposed (13, all read-only)
+## Tools exposed (16, all read-only)
 
 | Tool | Purpose |
 |---|---|
@@ -37,19 +37,119 @@ Databricks SQL is a fast-follow.
 | `column_stats`, `top_values` | Profile a single column |
 | `time_series` | Bucket by hour/day/week/month/quarter/year — dialect-correct everywhere |
 | `search_value` | Find a literal across a table's text columns |
+| `glossary_lookup` | Read business-glossary terms from the semantic layer (in-memory, no warehouse I/O) |
+| `schema_lookup` | Read schema-level docs — purpose, owner, refresh, table list |
+| `table_lookup` | Read full semantic doc for one table — description + column metadata |
 
-## Roles (four read tiers + admin)
+## Roles (five tiers)
 
 | Role | Tools allowed |
 |---|---|
-| `metadata_only` | Catalog discovery only — never reads row data |
+| `semantic_only` | Only the three semantic-lookup tools — zero warehouse access; pair with `semantic=on` for a docs-viewer persona |
+| `metadata_only` | Catalog discovery + semantic lookups — never reads row data |
 | `reader_restricted` | Aggregates / samples / time series — no arbitrary SELECT |
 | `reader` | Adds `query` and `search_value` (the general analyst tier) |
 | `admin` | Everything; future write tools when `ENABLE_WRITE_TOOLS` ships |
 
-Per-key role assigned via `MCP_API_KEYS=key:role[:set_role=warehouse_role]`. The optional `set_role=` directive issues `SET ROLE` on Postgres/Redshift so the warehouse's own RLS / CLS / masking policies enforce per-key access — no policy duplication in MCP.
+Per-key role assigned via `MCP_API_KEYS=key:role[:set_role=warehouse_role][:semantic=on|off]`. The optional `set_role=` directive issues `SET ROLE` on Postgres/Redshift so the warehouse's own RLS / CLS / masking policies enforce per-key access — no policy duplication in MCP. The optional `semantic=on|off` directive overrides `SEMANTIC_DEFAULT` for that one key, controlling whether the session sees the `warehouse://semantic/*` resources (see [docs/semantic-metadata.md](https://github.com/kalehdoo/warehouse-mcp/blob/main/docs/semantic-metadata.md#toggling-semantic-per-session)).
 
 For deployments with multiple existing DB roles (finance, hr, payroll, etc.) and many human users, see [docs/multi-role-deployment.md](https://github.com/kalehdoo/warehouse-mcp/blob/main/docs/multi-role-deployment.md) — walks through mapping ~10 DB roles to MCP keys, the recommended `<area>` / `<area>_restricted` pattern, and when to graduate from static keys to OIDC.
+
+## Sample mcp connection json(change based on your role):
+{
+  "mcpServers": {
+    "warehouse-admin-semanticon": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "http://localhost:3001/mcp",
+        "--header",
+        "Authorization: Bearer admin-key-change-me"
+      ]
+    },
+    "warehouse-admin-semanticoff": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "http://localhost:3001/mcp",
+        "--header",
+        "Authorization: Bearer admin-key-nosemantic"
+      ]
+    },
+    "warehouse-reader-semanticon": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "http://localhost:3001/mcp",
+        "--header",
+        "Authorization: Bearer reader-key-change-me"
+      ]
+    },
+    "warehouse-reader-semanticoff": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "http://localhost:3001/mcp",
+        "--header",
+        "Authorization: Bearer reader-key-nosemantic"
+      ]
+    },
+    "warehouse-reader-restricted-semanticon": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "http://localhost:3001/mcp",
+        "--header",
+        "Authorization: Bearer restricted-key-change-me"
+      ]
+    },
+    "warehouse-reader-restricted-semanticoff": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "http://localhost:3001/mcp",
+        "--header",
+        "Authorization: Bearer restricted-key-nosemantic"
+      ]
+    },
+    "warehouse-metadata-only-semanticon": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "http://localhost:3001/mcp",
+        "--header",
+        "Authorization: Bearer metadata-only-key-change-me"
+      ]
+    },
+    "warehouse-metadata-only-semanticoff": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "http://localhost:3001/mcp",
+        "--header",
+        "Authorization: Bearer metadata-only-key-nosemantic"
+      ]
+    },
+    "warehouse-docs-viewer-only": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "http://localhost:3001/mcp",
+        "--header",
+        "Authorization: Bearer docs_viewer_key_change_me"
+      ]
+    }
+  }
+}
 
 ## Quick start
 
@@ -140,9 +240,22 @@ For testcontainers integration tests against real Postgres: `npm run test:integr
 
 ## Optional: Semantic metadata (v0.4+)
 
-Teach the AI agent **what your warehouse means**, not just what's in it. Drop YAML files describing your business glossary and table semantics into a directory, point `SEMANTIC_DIR` at it, and the agent fetches them as MCP resources before issuing queries — instead of guessing what "revenue" or "active customer" mean from column names.
+Teach the AI agent **what your warehouse means**, not just what's in it. Drop YAML files describing your business glossary and table semantics into a directory, point `SEMANTIC_DIR` at it, and the agent gets two access channels into the same in-memory index:
+
+- **MCP resources** at `warehouse://semantic/*` — what tool-aware clients (Cursor, MCP Inspector) read proactively before issuing queries.
+- **MCP tools** `glossary_lookup`, `schema_lookup`, `table_lookup` — same data via the tool channel, for clients (Claude Desktop) whose UI is tool-centric and may suppress resource-only servers. Pure in-memory `Map.get`s — no warehouse I/O, no audit cost beyond a normal tool log line.
 
 Format follows dbt's `schema.yml` v2 with one extension (`meta.schema:` per model). Customers using dbt can point `SEMANTIC_DIR` at their existing `models/` directory and reuse most of what they have. See [docs/semantic-metadata.md](https://github.com/kalehdoo/warehouse-mcp/blob/main/docs/semantic-metadata.md) and the starter [docs/semantic-templates/](https://github.com/kalehdoo/warehouse-mcp/tree/main/docs/semantic-templates).
+
+### Per-session toggle
+
+Whether a session sees the semantic layer is independent of whether the YAMLs are loaded — `SEMANTIC_DIR` controls loading; `SEMANTIC_DEFAULT=on|off` and the per-key `semantic=on|off` option (or `include_semantic` JWT claim) control per-session visibility. The YAMLs are always loaded and validated at boot so you can flip a kill-switch without restarting. Three precedence layers, highest first:
+
+1. **Per-JWT claim** — `include_semantic: true|false` (OIDC).
+2. **Per-API-key option** — `semantic=on|off` in `MCP_API_KEYS`.
+3. **Server default** — `SEMANTIC_DEFAULT=on|off` (default `on`).
+
+Each tool-call audit row records the resolved `include_semantic` value so you can correlate query quality with semantic exposure after the fact.
 
 ## Optional: OpenTelemetry tracing
 

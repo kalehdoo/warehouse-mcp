@@ -28,12 +28,21 @@ export async function authenticate(req, provider) {
   const apiKeys = provider.getApiKeys();
   const oidc = provider.getOidcConfig();
   const tenantId = provider.config.tenant.defaultTenantId;
+  // Server-wide default. Older providers (test doubles, etc.) won't define
+  // the getter — treat that as "on" so legacy callers keep working.
+  const semanticDefault =
+    typeof provider.getSemanticDefault === "function" ? provider.getSemanticDefault() : true;
   const authEnabled = apiKeys.size > 0 || Boolean(oidc);
 
   if (!authEnabled) {
     return {
       ok: true,
-      ctx: makeContext({ tenantId, role: "admin", principal: "dev-anonymous" }),
+      ctx: makeContext({
+        tenantId,
+        role: "admin",
+        principal: "dev-anonymous",
+        includeSemantic: semanticDefault,
+      }),
     };
   }
 
@@ -45,15 +54,17 @@ export async function authenticate(req, provider) {
   const entry = apiKeys.get(token);
   if (entry) {
     // The map stores either a bare role string (legacy v0.1.x callers / tests)
-    // or {role, warehouseRole} (v0.3+ format with optional impersonation).
+    // or {role, warehouseRole, includeSemantic} (v0.3+ format).
     const role = typeof entry === "string" ? entry : entry.role;
     const warehouseRole = typeof entry === "string" ? undefined : entry.warehouseRole;
+    const keyOverride = typeof entry === "string" ? undefined : entry.includeSemantic;
     return {
       ok: true,
       ctx: makeContext({
         tenantId,
         role,
         warehouseRole,
+        includeSemantic: keyOverride === undefined ? semanticDefault : keyOverride,
         principal: `key_${token.slice(-6)}`,
       }),
     };
@@ -62,12 +73,15 @@ export async function authenticate(req, provider) {
   if (oidc) {
     try {
       const claims = await verifyJwt(token, oidc);
+      const jwtOverride =
+        typeof claims.include_semantic === "boolean" ? claims.include_semantic : undefined;
       return {
         ok: true,
         ctx: makeContext({
           tenantId,
           role: claims.role || "reader_restricted",
           warehouseRole: claims.warehouse_role || undefined,
+          includeSemantic: jwtOverride === undefined ? semanticDefault : jwtOverride,
           principal: claims.sub || "jwt",
         }),
       };
