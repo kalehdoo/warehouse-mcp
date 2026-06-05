@@ -238,6 +238,11 @@ cp .env.example .env
 
 For testcontainers integration tests against real Postgres: `npm run test:integration` (Docker required).
 
+## env setup
+1. MCP_API_KEYS
+2. WAREHOUSE_TYPE
+3. SEMANTIC_DIR
+
 ## Optional: Semantic metadata (v0.4+)
 
 Teach the AI agent **what your warehouse means**, not just what's in it. Drop YAML files describing your business glossary and table semantics into a directory, point `SEMANTIC_DIR` at it, and the agent gets two access channels into the same in-memory index:
