@@ -65,7 +65,7 @@ export function createDuckDbAdapter(config) {
           conn,
           `SELECT DISTINCT schema_name FROM information_schema.schemata
            WHERE schema_name NOT IN ('pg_catalog','information_schema','main_temp')
-             AND catalog_name NOT IN ('system','temp')
+             AND catalog_name = current_database()
            ORDER BY schema_name`,
         );
         return rows.map((r) => r.schema_name);
@@ -80,7 +80,8 @@ export function createDuckDbAdapter(config) {
           conn,
           `SELECT table_name AS name, table_type AS kind
            FROM information_schema.tables
-           WHERE table_schema = '${escapeLiteral(schema)}'
+           WHERE table_catalog = current_database()
+             AND table_schema = '${escapeLiteral(schema)}'
            ORDER BY table_name`,
         );
         return rows.map((r) => ({
@@ -100,7 +101,8 @@ export function createDuckDbAdapter(config) {
           conn,
           `SELECT column_name AS name, data_type AS type, is_nullable
            FROM information_schema.columns
-           WHERE table_schema = '${escapeLiteral(schema)}'
+           WHERE table_catalog = current_database()
+             AND table_schema = '${escapeLiteral(schema)}'
              AND table_name = '${escapeLiteral(table)}'
            ORDER BY ordinal_position`,
         );
@@ -138,6 +140,7 @@ export function createDuckDbAdapter(config) {
           `SELECT DISTINCT table_schema AS schema, table_name AS "table", column_name AS "column", data_type AS "type"
            FROM information_schema.columns
            WHERE column_name ILIKE '${escapeLiteral(pattern)}'
+             AND table_catalog = current_database()
              ${schemaFilter}
            ORDER BY schema, "table", "column"`,
         );
@@ -156,7 +159,7 @@ export function createDuckDbAdapter(config) {
       // duckdb_constraints() returns one row per constraint with referenced
       // table info already split out. We filter to FOREIGN_KEY constraints.
       try {
-        const where = ["constraint_type = 'FOREIGN KEY'"];
+        const where = ["constraint_type = 'FOREIGN KEY'", "database_name = current_database()"];
         if (schema) where.push(`schema_name = '${escapeLiteral(schema)}'`);
         if (table) where.push(`table_name = '${escapeLiteral(table)}'`);
         const rows = await runAll(
@@ -198,7 +201,8 @@ export function createDuckDbAdapter(config) {
         const rows = await runAll(
           conn,
           `SELECT sql FROM duckdb_views()
-           WHERE schema_name = '${escapeLiteral(schema)}'
+           WHERE database_name = current_database()
+             AND schema_name = '${escapeLiteral(schema)}'
              AND view_name = '${escapeLiteral(view)}'`,
         );
         if (rows.length === 0) {

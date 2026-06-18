@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import { runAdapterContract } from "./contract.js";
 import { createDuckDbAdapter } from "../../src/adapters/duckdb.js";
 
@@ -18,4 +19,22 @@ runAdapterContract("DuckDB", async () => {
       return { schema: "demo", table: "widgets" };
     },
   };
+});
+
+describe("DuckDB — catalog scoping", () => {
+  it("lists schemas only from the current catalog", async () => {
+    const adapter = createDuckDbAdapter({ path: ":memory:" });
+    try {
+      await adapter.query(`CREATE SCHEMA IF NOT EXISTS demo`);
+      await adapter.query(`ATTACH ':memory:' AS analytics`);
+      await adapter.query(`CREATE SCHEMA analytics.other`);
+
+      const schemas = await adapter.listSchemas();
+
+      expect(schemas).toContain("demo");
+      expect(schemas).not.toContain("other");
+    } finally {
+      await adapter.close();
+    }
+  });
 });
